@@ -24,6 +24,8 @@ irreversible. Use a local sandbox instead when it can do the work safely.
 - Never retry `500 provision_failed` or `500 settle_uncertain`. Payment succeeded or may
   have succeeded, so a retry can charge twice.
 - Report the paid amount, token, transaction hash, instance, expiry, and poll URL.
+- Preserve the paid response. The poll URL is a capability and `buy receipts` does not yet
+  retain it for streamed CLI calls.
 - SSH is a second purchase route, not a flag on `/gcloud/vm`. It is enabled on the public
   deployment. Quote and buy `/gcloud/ssh` for it, and tell the user an interactive session
   bills egress to the operator, so they should close it when done.
@@ -224,15 +226,25 @@ buy_curl
 
 An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the paid retry:
 
-```sh
-npx --yes @celo/buy@0.4.1 --verbose curl --max-amount 0.02 \
-  -X POST \
-  --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
-  https://buy.celo-testnet.org/gcloud/vm
+```bash
+(
+  umask 077
+  set -o pipefail
+  response_file=$(mktemp ./buy-vm.XXXXXX) || exit
+  npx --yes @celo/buy@0.4.1 --verbose curl --max-amount 0.02 \
+    -X POST \
+    --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
+    https://buy.celo-testnet.org/gcloud/vm | tee "$response_file"
+  response_status=$?
+  printf 'Private response saved to %s\n' "$response_file" >&2
+  exit "$response_status"
+)
 ```
 
 Set `--max-amount` from the current quote rather than copying the example. Add
-`--token USDT` only when the user chose USDT.
+`--token USDT` only when the user chose USDT. Keep the generated response file private: it
+contains the poll URL used to read the result. Delete it after the lease and retained-result
+window end.
 
 ## Collect the result
 
@@ -281,7 +293,7 @@ A successful purchase returns the usual `transaction`, `instance`, `expiresAt`, 
 fields, plus `ip`, `user`, and a ready-made `ssh` command:
 
 ```json
-{"instance":"cpay-…","ip":"35.212.153.43","user":"buy","ssh":"ssh buy@35.212.153.43",
+{"instance":"<instance>","ip":"35.212.153.43","user":"buy","ssh":"ssh buy@35.212.153.43",
  "expiresAt":"…","poll":"https://buy.celo-testnet.org/gcloud/vm/<token>"}
 ```
 
@@ -326,8 +338,8 @@ is retained for polling.
 The paying wallet is the ownership check that binds today. A different wallet receives
 `403 not_your_lease`. The verified Self identity half of that ownership check is inactive
 while the per-human limits and stable server-side Self endpoint are disabled, so describe
-the current rule as wallet-only. Self verification itself is still required on every
-renewal.
+the current rule as wallet-only. Self verification is rechecked only when the VM type is
+in the attestation-gated tier.
 
 `200` with `unconfirmed: true` means the extension succeeded but the new deadline could
 not yet be read back. No refund is due. Poll for the confirmed deadline; this is not a
@@ -353,3 +365,12 @@ failed renewal.
 A network disconnect after sending a paid request is also ambiguous. Do not purchase a
 replacement merely because the response was lost. Preserve any receipt or transaction
 information and tell the user what is known.
+
+Inspect local payment history with `buy receipts` (or
+`npx --yes @celo/buy@0.4.1 receipts`). It can show the time, target URL, amount, and network;
+some non-streamed entries also include a transaction hash. It is not full VM recovery
+today: streamed `buy curl` receipts do not retain the paid response, transaction hash,
+poll URL, instance, IP, or correlation ID. That limitation is tracked in
+[cpay#85](https://github.com/celo-org/cpay/issues/85).
+For CLI purchases, preserve the response with the private `tee` pattern above; do not retry
+a payment because recovery fields are absent from a receipt.
