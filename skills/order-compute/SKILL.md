@@ -60,12 +60,16 @@ they hand back:
 |---|---:|---:|---:|---:|---|
 | `e2-micro` | 0.25 | 2 | 1 GiB | 0.016753 USDC or USDT | not required |
 | `e2-small` | 0.5 | 2 | 2 GiB | 0.033506 USDC or USDT | not required |
-| `e2-medium` | 1 | 2 | 4 GiB | 0.067011 USDC or USDT | **required** |
+| `e2-medium` | 1 | 2 | 4 GiB | 0.067011 USDC or USDT | not required |
+| `e2-standard-2` | 2 | 2 | 8 GiB | 0.134023 USDC or USDT | **required** |
+| `e2-standard-4` | 4 | 4 | 16 GiB | 0.268046 USDC or USDT | **required** |
+| `e2-standard-8` | 8 | 8 | 32 GiB | 0.536091 USDC or USDT | **required** |
 
-**`nproc` reports 2 on every type, and that is not the table being wrong.** E2 shared-core
-machines expose two logical CPUs while guaranteeing only the vCPU share above; the share
-is what the workload actually gets sustained, and the core count is what the guest sees.
-A script that reads `nproc` to size a thread pool will over-subscribe an `e2-micro` by 8x.
+**The shared-core types report `nproc=2`, while standard types report their full CPU
+count.** For shared-core machines, E2 exposes two logical CPUs while guaranteeing only
+the vCPU share above; the share is what the workload actually gets sustained, and the
+core count is what the guest sees. A script that reads `nproc` to size a thread pool will
+over-subscribe an `e2-micro` by 8x.
 
 Every VM gets a **10 GB pd-standard** boot disk and a plain `debian-12` image. Nothing is
 preinstalled beyond that image: **Docker is not installed**, and neither is any language
@@ -91,10 +95,11 @@ Choose the smallest machine that fits:
 
 - `e2-micro`: shell utilities, network probes, and small scripts.
 - `e2-small`: light builds or jobs that need 2 GiB RAM.
-- `e2-medium`: heavier builds within the service's one-core, 4 GiB ceiling. This is the
-  only type that requires a Self attestation.
+- `e2-medium`: heavier builds that fit in one core and 4 GiB.
+- `e2-standard-2`, `e2-standard-4`, and `e2-standard-8`: larger builds with 8, 16, and
+  32 GiB RAM respectively; these require a Self attestation.
 
-The public service admits at most 50 live or provisioning VMs and $2/hour of aggregate
+The public service admits at most 200 live or provisioning VMs and $25/hour of aggregate
 catalogued compute. Per-human counters are not active during the hackathon: they key on a
 verified nullifier, and the endpoint is not pinned, so only the aggregate caps bind.
 
@@ -141,8 +146,9 @@ keychain wallet; it does not expose the private key to the agent.
 
 ## Obtain the Self attestation
 
-**Only `e2-medium` requires one.** `e2-micro` and `e2-small` are buyable with no proof at
-all, on both routes — the gateway requires an attestation only above a spend threshold, so
+**Only `e2-standard-2`, `e2-standard-4`, and `e2-standard-8` require one.**
+`e2-micro`, `e2-small`, and `e2-medium` are buyable with no proof at all, on both routes —
+the gateway requires an attestation only above a spend threshold, so
 someone without a compatible identity document can still use the service. Check before
 sending a user through verification: if the 402 challenge carries no
 `extra.selfRequirements`, none is needed.
@@ -177,8 +183,10 @@ displayed QR code. Mock passports are rejected by this deployment: they register
 Self's staging hub, and the gateway verifies against the mainnet hub, so a mock proof
 fails with `InvalidRoot: Onchain root does not exist`. No tunnel and no
 `cloudflared` — the gateway hosts the Self receiver, so nothing listens on the user's
-machine. The `--endpoint` value is whatever the 402 pinned; a failed `buy curl` prints
-the whole command with it already filled in, so prefer copying that over typing this.
+machine. This gateway hosts a receiver but does not **pin** one, so its 402 carries no
+`endpoint` field and there is nothing to copy out of a failed `buy curl` — use the URL
+above. Against a gateway that does pin, the 402's `extra.selfRequirements.endpoint` is
+authoritative and overrides it.
 
 Only the user can complete this proof. If it is missing or stale, stop and ask them to
 run the command again. Retrying a purchase does not create or refresh an attestation.
@@ -309,8 +317,8 @@ buy_curl
 ```
 
 Quote that renewal URL first, obtain approval for the new payment, and use the returned
-`maxAmountRequired`. A renewal is a separate irreversible payment, rechecks the Self
-attestation, and reboots the VM. The boot disk survives, but the ephemeral external IP may
+`maxAmountRequired`. A renewal is a separate irreversible payment and reboots the VM;
+for the attestation-gated `e2-standard-*` sizes it also rechecks the Self attestation. The boot disk survives, but the ephemeral external IP may
 change; always use the renewed response's `ip` and expect SSH to warn about a changed host key. It cannot extend the instance beyond 24 hours from its
 original creation. A completed script normally does not need renewal because its result
 is retained for polling.
