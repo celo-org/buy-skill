@@ -9,7 +9,7 @@ Buy a real, short-lived Debian VM that runs one script as root and returns its o
 public hackathon gateway is:
 
 ```text
-https://buy.celo-testnet.org/gcloud/vm
+https://usebuy.ai/gcloud/vm
 ```
 
 Despite the temporary hostname, it settles real USDC or USDT on Celo mainnet. Payment is
@@ -36,7 +36,7 @@ Before choosing a machine type or calculating a payment, query the live catalog.
 CLI, issue a free `GET` request to:
 
 ```text
-https://buy.celo-testnet.org/gcloud/catalog
+https://usebuy.ai/gcloud/catalog
 ```
 
 `GET /gcloud/catalog` is free and side-effect free. Use its `machineTypes` entries for
@@ -161,7 +161,7 @@ Where one IS required, these are the live requirements, as served by the gateway
 |---|---|
 | scope | `buy.celo` |
 | endpoint type | `https` (production Self hub, Celo mainnet) |
-| hosted receiver | `https://buy.celo-testnet.org/self/api/verify` |
+| hosted receiver | `https://usebuy.ai/self/api/verify` |
 | minimum age | 18 |
 | OFAC screening | enabled |
 | mock passports | **rejected** — the gateway runs `BUY_SELF_MOCK_PASSPORT=0` |
@@ -177,7 +177,7 @@ Those scope, age, and OFAC values are CLI defaults. The user must run:
 
 ```sh
 npx --yes @celo/buy@0.4.1 verify hosted \
-  --endpoint https://buy.celo-testnet.org/self/api/verify
+  --endpoint https://usebuy.ai/self/api/verify
 ```
 
 This step needs only the Self mobile app with the user's REAL passport, then scan the
@@ -200,7 +200,7 @@ used for the purchase:
 
 ```text
 buy_pay_quote
-  url:    https://buy.celo-testnet.org/gcloud/vm
+  url:    https://usebuy.ai/gcloud/vm
   method: POST
   body:   "{\"script\":\"uname -a; nproc\",\"machineType\":\"e2-micro\"}"
 ```
@@ -213,7 +213,7 @@ Then reuse the same URL, method, and body:
 
 ```text
 buy_curl
-  url:       https://buy.celo-testnet.org/gcloud/vm
+  url:       https://usebuy.ai/gcloud/vm
   method:    POST
   body:      "{\"script\":\"uname -a; nproc\",\"machineType\":\"e2-micro\"}"
   maxAmount: "<maxAmountRequired from the quote>"
@@ -234,7 +234,7 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
   npx --yes @celo/buy@0.4.1 --verbose curl --max-amount 0.02 \
     -X POST \
     --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
-    https://buy.celo-testnet.org/gcloud/vm | tee "$response_file"
+    https://usebuy.ai/gcloud/vm | tee "$response_file"
   response_status=$?
   printf 'Private response saved to %s\n' "$response_file" >&2
   exit "$response_status"
@@ -273,14 +273,14 @@ injected, instead of running a script. Quote it exactly like the script route. W
 npx --yes @celo/buy@0.4.1 --verbose curl --max-amount 0.07 \
   -X POST \
   --data '{"sshKey":"ssh-ed25519 AAAA… user@host","machineType":"e2-micro"}' \
-  https://buy.celo-testnet.org/gcloud/ssh
+  https://usebuy.ai/gcloud/ssh
 ```
 
 With MCP, use:
 
 ```text
 buy_pay_quote
-  url:    https://buy.celo-testnet.org/gcloud/ssh
+  url:    https://usebuy.ai/gcloud/ssh
   method: POST
   body:   "{\"sshKey\":\"ssh-ed25519 AAAA… user@host\",\"machineType\":\"e2-micro\"}"
 ```
@@ -294,7 +294,7 @@ fields, plus `ip`, `user`, and a ready-made `ssh` command:
 
 ```json
 {"instance":"<instance>","ip":"35.212.153.43","user":"buy","ssh":"ssh buy@35.212.153.43",
- "expiresAt":"…","poll":"https://buy.celo-testnet.org/gcloud/vm/<token>"}
+ "expiresAt":"…","poll":"https://usebuy.ai/gcloud/vm/<token>"}
 ```
 
 The poll URL stays under `/gcloud/vm/<token>` for both routes, and so does renewal.
@@ -315,7 +315,7 @@ Use the original poll token:
 
 ```text
 buy_pay_quote
-  url:    https://buy.celo-testnet.org/gcloud/vm/<poll-token>/renew
+  url:    https://usebuy.ai/gcloud/vm/<poll-token>/renew
   method: POST
 ```
 
@@ -323,7 +323,7 @@ Then use the renewal quote's atomic amount:
 
 ```text
 buy_curl
-  url:       https://buy.celo-testnet.org/gcloud/vm/<poll-token>/renew
+  url:       https://usebuy.ai/gcloud/vm/<poll-token>/renew
   method:    POST
   maxAmount: "<maxAmountRequired from the renewal quote>"
 ```
@@ -353,7 +353,7 @@ failed renewal.
 | `404` on `/gcloud/ssh` | No | That deployment runs `BUY_GCE_ALLOW_SSH=0`. Use `/gcloud/vm`. |
 | `insufficient_balance` (client-side balance check) | No | The wallet cannot cover the price. For a KYC-gated request, Self attestation is checked first; an unverified wallet may see `self_attestation_required` before the balance check. Once the attestation is available, no payment is signed or sent. Fund the wallet, then retry. There is no mainnet faucet.
 | `402 verify_payment_failed` | No | Ask the user to fund or select the correct wallet/token. |
-| `402 verify_self_failed` | No | Ask the user to rerun `verify hosted --endpoint https://buy.celo-testnet.org/self/api/verify`. |
+| `402 verify_self_failed` | No | Ask the user to rerun `verify hosted --endpoint https://usebuy.ai/self/api/verify`. |
 | `403` or `409` on renewal | No | Follow the returned ownership, lifetime, or transition error. |
 | `503 at_capacity` | No | Retry later only if the user still wants the purchase. |
 | `503 at_spend_capacity` | No | Try a smaller VM or retry later with user approval. |
