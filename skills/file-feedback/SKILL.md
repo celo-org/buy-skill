@@ -240,8 +240,10 @@ in sync by hand. Report the returned issue URL to the user, then delete the temp
 
 ## File it from the browser instead
 
-**When `template=` names an issue form, the `body` parameter is ignored.** Prefill an issue
-form by using each field's `id` as a query parameter:
+**Prefill an issue form by using each field's `id` as a query parameter, not `body`.** GitHub
+documents `body` for Markdown templates; for a YAML form it documents only that "query
+parameters for issue form fields can also be passed to the issue template chooser". Do not
+send `body` alongside `template` and assume it lands — write each field by id:
 
 ```text
 https://github.com/celo-org/buy-skill/issues/new
@@ -251,9 +253,15 @@ https://github.com/celo-org/buy-skill/issues/new
   &error=500%20settle_uncertain%0Acorrelation%3A%20abc123
 ```
 
-Leave `labels` out entirely. It is dropped for anyone without write access, and the form
-applies its own labels server-side, which needs no permission from the reporter. A dropdown
-such as `charged` prefills only when the value matches the option's display text exactly.
+Leave `labels` out entirely. GitHub requires permission to add a label in order to use the
+`labels` parameter, so it does nothing for an outside reporter, and the form applies its own
+labels server-side anyway, which needs no permission from them.
+
+**Prefill is reliable for `input` and `textarea` fields and unreliable for `dropdown` and
+`checkboxes`.** Do not assume the `route` and `charged` dropdowns arrive selected. Tell the
+user which option to pick, in the sentence where you hand over the URL, and put the same fact
+in a text field that does prefill — for a payment problem, restate the charged status in
+`actual` — so the report still carries it if the dropdown comes up empty.
 
 Encode with a tool, not by hand:
 
@@ -280,9 +288,10 @@ python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(),sa
 | `%` | `%25` |
 
 **An over-long URL returns `414 URI Too Long` — the page fails, it does not truncate.**
-Percent-encoding a multi-line body roughly triples its length, so keep the whole assembled
-URL under 6,000 characters. When it is longer, trim in this order and stop as soon as it
-fits:
+GitHub documents the error but publishes no character limit, so treat 6,000 characters for
+the whole assembled URL as a working ceiling rather than a measured one. Percent-encoding a
+multi-line body roughly triples its length, so a 2,000-character report is already close.
+When it is longer, trim in this order and stop as soon as it fits:
 
 1. `environment` — reduce to the four collected lines.
 2. `error` — keep the first and last 15 lines, with `… <n> lines elided …` between.
@@ -306,6 +315,7 @@ correlation ID.
 | Network failure mid-`gh issue create` | Maybe | Search for the exact title before retrying; the issue may already exist. |
 | `414 URI Too Long` on the fallback URL | No | Trim per the ladder above and reissue. |
 | Template chooser opens instead of the form | No | The `template=` filename is wrong or not on the default branch. Pick from the chooser and prefill by hand. |
+| A dropdown comes up unselected | No | Expected; prefill is unreliable for dropdowns. Tell the user which option to pick. |
 | User declines to file | No | Do not file. Keep or delete the draft as they choose. |
 | User edits the approved text | No | Re-run the redaction scan, then re-ask. |
 
