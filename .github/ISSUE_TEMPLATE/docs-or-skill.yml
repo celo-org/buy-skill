@@ -1,0 +1,47 @@
+name: A skill or doc is wrong or unclear
+description: A SKILL.md, the README, or the docs say something inaccurate, out of date, or ambiguous.
+title: "[docs] "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste private keys or poll URLs in your examples.
+
+  - type: input
+    id: where
+    attributes:
+      label: Where?
+      description: A path and section, or a permalink.
+      placeholder: skills/order-compute/SKILL.md — "What is available"
+    validations:
+      required: true
+
+  - type: textarea
+    id: says
+    attributes:
+      label: What it says
+      description: Quote the line.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: reality
+    attributes:
+      label: What is actually true
+      description: How did you observe this? A command and its output is ideal.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: What went wrong because of it
+      description: Did it cost you a payment, or just time?
+
+  - type: input
+    id: version
+    attributes:
+      label: "`@celo/buy` version you were using"
+      placeholder: "0.5.0"

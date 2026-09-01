@@ -11,6 +11,7 @@ charge twice. That is what these skills are for.
 | Skill | What it teaches |
 |---|---|
 | [`order-compute`](skills/order-compute/SKILL.md) | Buying a short-lived GCP VM through the public gateway — quoting before paying, running a script or opening an SSH session, polling for results, renewing a lease, and which failures are safe to retry. |
+| [`file-feedback`](skills/file-feedback/SKILL.md) | Reporting a bug, a wrong instruction, a payment problem, or an idea back to the maintainers — redacting keys and poll URLs, checking for duplicates, drafting the report for your approval, and filing it with `gh` or a prefilled issue URL. |
 
 ## Installing a skill
 
@@ -22,8 +23,10 @@ For Claude Code, either globally:
 ```sh
 git clone https://github.com/celo-org/buy-skill.git
 mkdir -p ~/.claude/skills
-cp -r buy-skill/skills/order-compute ~/.claude/skills/
+cp -r buy-skill/skills/<name> ~/.claude/skills/
 ```
+
+`<name>` is the directory from the table above, e.g. `order-compute`.
 
 or scoped to a single project, in that project's `.claude/skills/`.
 
@@ -56,6 +59,22 @@ skill spends most of its length on:
   before settlement.
 
 Fund the wallet like a float, not a treasury. Nothing prompts per payment.
+
+## Feedback
+
+This repository is the front door for everything `buy` — the skills here, the CLI, the MCP
+server, the gateway, and payments. File it here whatever broke; maintainers route it onward.
+
+[Open an issue](https://github.com/celo-org/buy-skill/issues/new/choose), or install
+[`file-feedback`](skills/file-feedback/SKILL.md) and let the agent draft the report for you.
+It searches for duplicates, fills the right form, and shows you the exact text before
+anything is posted.
+
+One thing to check before you paste: a poll URL — `https://usebuy.ai/gcloud/vm/<token>` — is
+a bearer capability. Anyone who reads it can read your result and renew your lease at your
+expense. Redact the token. The same goes for private keys, seed phrases, SSH private keys,
+and anything Self handed you. A transaction hash is already public on-chain and is the most
+useful thing you can include.
 
 ## Other MCP clients
 

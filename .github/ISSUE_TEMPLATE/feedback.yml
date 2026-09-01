@@ -1,0 +1,22 @@
+name: General feedback
+description: Praise, friction, confusion, or anything that does not fit the other forms.
+title: "[feedback] "
+labels: ["question"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: What were you building?
+      description: Helps us tell a one-off from a pattern.
+
+  - type: markdown
+    attributes:
+      value: |
+        Redact keys and poll URLs from anything you paste.

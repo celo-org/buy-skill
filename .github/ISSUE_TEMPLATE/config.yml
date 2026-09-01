@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: buy on npm — releases and changelog
+    url: https://www.npmjs.com/package/@celo/buy
+    about: Check you are on the current release before filing a bug.
+  - name: order-compute skill
+    url: https://github.com/celo-org/buy-skill/blob/main/skills/order-compute/SKILL.md
+    about: How to quote, pay, poll, and renew — and which failures are safe to retry.

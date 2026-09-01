@@ -1,0 +1,142 @@
+name: Payment or settlement problem
+description: Money moved, or may have moved, and something went wrong. Use this even when it also looks like an ordinary bug.
+title: "[payment] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This issue is public, permanent, and indexed.** Before you submit, remove:
+
+        - private keys, seed phrases, and keychain contents
+        - the **poll URL** `https://usebuy.ai/gcloud/vm/<token>` — anyone who reads it can
+          read your result and renew your lease at your expense. Write `<redacted>` in place
+          of the token.
+        - the saved response file from the `tee` pattern, pasted whole — it contains that URL
+        - SSH private keys, and any Self proof, nullifier, or passport material
+
+        Safe and genuinely useful: transaction hash (already public on-chain), correlation
+        ID, error code, HTTP status, route, machine type, `@celo/buy` and Node versions, OS,
+        MCP client, and timestamps with a timezone. Your wallet address is optional and left
+        out by default — including it links your spending history to this issue forever.
+
+  - type: input
+    id: goal
+    attributes:
+      label: What were you trying to buy?
+      placeholder: An e2-micro VM to run a one-line script
+    validations:
+      required: true
+
+  - type: dropdown
+    id: route
+    attributes:
+      label: Route
+      description: Which endpoint the payment was for.
+      options:
+        - "POST /gcloud/vm"
+        - "POST /gcloud/ssh"
+        - "POST /gcloud/vm/<token>/renew"
+        - "Other or not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: charged
+    attributes:
+      label: Was a payment charged?
+      description: If you are not sure, say so — that is useful.
+      options:
+        - "No — refused before anything was signed"
+        - "Yes — there is a transaction on-chain"
+        - "Maybe — the response was lost, or said settle_uncertain"
+        - "I do not know how to check"
+    validations:
+      required: true
+
+  - type: input
+    id: amount
+    attributes:
+      label: Amount and token
+      placeholder: 0.016753 USDC
+
+  - type: input
+    id: tx
+    attributes:
+      label: Transaction hash
+      description: Already public on Celoscan. The most useful single field in this report. `0x` followed by 64 characters.
+      placeholder: "0x…"
+
+  - type: input
+    id: correlation
+    attributes:
+      label: Correlation ID
+      description: From the error response, or from `--verbose` output.
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Full error text
+      description: Verbatim, not paraphrased. Remove any poll URL.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Exact command or MCP tool call
+      description: Redact secrets. Do not paste your saved response file.
+      placeholder: npx --yes @celo/buy@0.5.0 --verbose curl --max-amount 0.02 -X POST …
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Include whether a VM ever appeared.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: "`npx --yes @celo/buy@0.5.0 --version`, `node --version`, `uname -srm`, and your MCP client if you used one."
+      placeholder: |
+        @celo/buy: 0.5.0
+        node: v20.11.1
+        os: Darwin 24.5.0 arm64
+        client: Claude Code (MCP) / plain CLI
+        time: 2026-09-01T14:03:00Z
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: wallet
+    attributes:
+      label: Wallet address — optional
+      description: Only include this if you want us to correlate on-chain. It publicly and permanently links your spending history to this issue.
+      placeholder: "0x… (optional)"
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed private keys, seed phrases, and SSH private keys.
+          required: true
+        - label: I replaced any https://usebuy.ai/gcloud/vm/<token> poll URL with <redacted>.
+          required: true
+        - label: I searched existing issues for this error.
+          required: true
