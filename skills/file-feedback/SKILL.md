@@ -60,6 +60,7 @@ about that.
 | MCP client name and version | Yes | e.g. "Claude Code 2.x". |
 | Timestamp with timezone or UTC offset | Yes | A bare local time is unusable server-side. |
 | Amount and token | Yes | `0.016753 USDC`. |
+| External IP, and the ready-made `ssh buy@<ip>` command | Only on opt-in, after the lease ends | Say "an ephemeral external IP". The instance name is enough to correlate. |
 
 **`0x` followed by 64 hex characters is a transaction hash — public, safe, wanted. `0x`
 followed by 40 hex characters is an address — the user's, and only theirs to publish.** That
@@ -71,6 +72,7 @@ Once the body is drafted, run a backstop scan over it before showing it to the u
 grep -nEi \
   -e 'usebuy\.ai/gcloud/vm/[A-Za-z0-9_.-]{8,}' \
   -e '0x[0-9a-fA-F]{40}([^0-9a-fA-F]|$)' \
+  -e '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' \
   -e 'BEGIN [A-Z ]*PRIVATE KEY' \
   -e '(mnemonic|seed phrase|privatekey|private_key)' \
   "$body_file"
@@ -78,7 +80,8 @@ grep -nEi \
 
 **This grep is a backstop, not the check.** Read the body yourself. It will not catch a seed
 phrase written as prose, a key inside a screenshot, or a poll token the user pasted without
-its hostname.
+its hostname. The IP pattern also flags harmless dotted quads such as a version string;
+resolve those by reading, which is the posture for the whole scan.
 
 ## Choose a category
 
@@ -233,10 +236,10 @@ BODY
 
 The heredoc is quoted (`<<'BODY'`) so the shell does not expand `$` or backticks inside the
 user's error text. `--label` is best effort: a reporter without write access cannot set
-labels and `gh` fails the whole call, so re-run without `--label` on that error — the title
-prefix carries the category. `gh issue create --template` applies only in interactive mode
-and does nothing here; the forms and the `gh` path are separate routes that this skill keeps
-in sync by hand. Report the returned issue URL to the user, then delete the temp file.
+labels, and `gh` may reject the call rather than warn, so re-run without `--label` on any
+label error — the title prefix carries the category. `gh issue create --template` applies
+only in interactive mode and does nothing here; the forms and the `gh` path are separate
+routes that this skill keeps in sync by hand. Report the returned issue URL to the user, then delete the temp file.
 
 ## File it from the browser instead
 
@@ -263,15 +266,16 @@ user which option to pick, in the sentence where you hand over the URL, and put 
 in a text field that does prefill — for a payment problem, restate the charged status in
 `actual` — so the report still carries it if the dropdown comes up empty.
 
-Encode with a tool, not by hand:
+Encode each field value separately, with a tool rather than by hand. `$body_file` belongs
+to the `gh` path; the browser path never encodes the whole report as one string:
 
 ```sh
-jq -Rrs @uri < "$body_file"
+printf '%s' "$goal" | jq -Rrs @uri
 ```
 
 ```sh
-python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(),safe=""))' \
-  < "$body_file"
+printf '%s' "$goal" \
+  | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(),safe=""))'
 ```
 
 | Character | Encode as |
@@ -293,7 +297,7 @@ the whole assembled URL as a working ceiling rather than a measured one. Percent
 multi-line body roughly triples its length, so a 2,000-character report is already close.
 When it is longer, trim in this order and stop as soon as it fits:
 
-1. `environment` — reduce to the four collected lines.
+1. `environment` — reduce to the five lines above.
 2. `error` — keep the first and last 15 lines, with `… <n> lines elided …` between.
 3. `repro` — keep the command, drop the surrounding narration.
 4. Still over: set the remaining long field to `see pasted details below`, print the full
