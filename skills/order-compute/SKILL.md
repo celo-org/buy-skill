@@ -370,7 +370,6 @@ Inspect local payment history with `buy receipts` (or
 `npx --yes @celo/buy@0.5.0 receipts`). It can show the time, target URL, amount, and network;
 some non-streamed entries also include a transaction hash. It is not full VM recovery
 today: streamed `buy curl` receipts do not retain the paid response, transaction hash,
-poll URL, instance, IP, or correlation ID. That limitation is tracked in
-[cpay#85](https://github.com/celo-org/cpay/issues/85).
+poll URL, instance, IP, or correlation ID. That limitation is known and tracked upstream.
 For CLI purchases, preserve the response with the private `tee` pattern above; do not retry
 a payment because recovery fields are absent from a receipt.

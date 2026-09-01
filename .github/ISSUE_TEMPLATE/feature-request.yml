@@ -1,0 +1,43 @@
+name: Feature request or new skill idea
+description: Something buy, or these skills, should be able to do and cannot.
+title: "[idea] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do that you cannot today?
+      description: Describe the problem, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you work around it now?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Which part?
+      options:
+        - "A new skill in this repo"
+        - "buy CLI"
+        - "buy MCP server"
+        - "Gateway — a new thing to buy"
+        - "Docs"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like to see
+
+  - type: markdown
+    attributes:
+      value: |
+        Redact keys and poll URLs from any example.

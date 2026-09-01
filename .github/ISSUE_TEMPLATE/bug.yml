@@ -1,0 +1,110 @@
+name: Bug in the CLI, MCP server, or gateway
+description: Something is broken and no payment settled. If money moved or may have moved, use "Payment or settlement problem" instead.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This issue is public, permanent, and indexed.** Remove private keys, seed phrases,
+        keychain contents, and SSH private keys. Replace any poll URL
+        `https://usebuy.ai/gcloud/vm/<token>` with `<redacted>` — anyone who reads it can read
+        your result and renew your lease at your expense.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part is broken?
+      options:
+        - "buy CLI"
+        - "buy MCP server"
+        - "Gateway (usebuy.ai)"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "`@celo/buy` version"
+      placeholder: "0.5.0"
+    validations:
+      required: true
+
+  - type: input
+    id: goal
+    attributes:
+      label: What were you trying to do?
+      placeholder: Quote an e2-medium before buying it
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Exact command or MCP tool call
+      description: Redact secrets and poll URLs.
+      placeholder: npx --yes @celo/buy@0.5.0 whoami
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Full error text
+      description: Verbatim, not paraphrased.
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: charged
+    attributes:
+      label: Did any payment get signed?
+      description: If yes or not sure, please use the payment form instead — it asks the questions we need.
+      options:
+        - "No"
+        - "Yes — I am also filing a payment problem"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: "`npx --yes @celo/buy@0.5.0 --version`, `node --version`, `uname -srm`, and your MCP client if you used one."
+      placeholder: |
+        @celo/buy: 0.5.0
+        node: v20.11.1
+        os: Darwin 24.5.0 arm64
+        client: Claude Code (MCP) / plain CLI
+        time: 2026-09-01T14:03:00Z
+      render: text
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed private keys, seed phrases, and SSH private keys.
+          required: true
+        - label: I replaced any https://usebuy.ai/gcloud/vm/<token> poll URL with <redacted>.
+          required: true
