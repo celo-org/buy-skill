@@ -12,8 +12,8 @@ public beta gateway is:
 https://usebuy.ai/gcloud/vm
 ```
 
-Despite the temporary hostname, it settles real USDC or USDT on Celo mainnet. Payment is
-irreversible. Use a local sandbox instead when it can do the work safely.
+It settles real USDC or USDT on Celo mainnet. Payment is irreversible. Use a local
+sandbox instead when it can do the work safely.
 
 ## Non-negotiable boundaries
 
@@ -24,7 +24,7 @@ irreversible. Use a local sandbox instead when it can do the work safely.
 - Never retry `500 provision_failed` or `500 settle_uncertain`. Payment succeeded or may
   have succeeded, so a retry can charge twice.
 - Report the paid amount, token, transaction hash, instance, expiry, and poll URL.
-- Preserve the paid response. The poll URL is a capability and `buy receipts` does not yet
+- Preserve the paid response. The poll URL is a capability and `buy receipts` does not
   retain it for streamed CLI calls.
 - SSH is a second purchase route, not a flag on `/gcloud/vm`. It is enabled on the public
   deployment. Quote and buy `/gcloud/ssh` for it, and tell the user an interactive session
@@ -79,10 +79,8 @@ toolchain. A script or session that needs one must install it, over HTTPS, withi
 lease. The `buy` login may appear in a `docker` group — GCE's guest agent adds SSH users
 to a standard group list — but that grants nothing, because there is no Docker daemon.
 
-**Those prices are indicative, not a contract.** Ask the gateway before spending: an
-unpaid request returns the current figure for the exact body you intend to send, and
-costs nothing. Use `buy_pay_quote` from an MCP client, or an unpaid POST from the CLI.
-The quote is what the gateway will charge; anything written here can age.
+Prices above are indicative; the catalog and the 402 quote for the exact body are
+authoritative, and anything written here can age.
 
 These are standard on-demand VMs, never Spot. They run in `us-west1`, start with a
 one-hour lease, and may be renewed up to 24 hours total from creation.
@@ -102,8 +100,7 @@ Choose the smallest machine that fits:
   32 GiB RAM respectively; these require a Self attestation.
 
 The public service admits at most 200 live or provisioning VMs and $25/hour of aggregate
-catalogued compute. Per-human counters are not active in the beta: they key on a
-verified nullifier, and the endpoint is not pinned, so only the aggregate caps bind.
+catalogued compute.
 
 ## Prepare the user's wallet
 
@@ -165,7 +162,6 @@ Where one IS required, these are the live requirements, as served by the gateway
 | minimum age | 18 |
 | OFAC screening | enabled |
 | mock passports | **rejected** — the gateway runs `BUY_SELF_MOCK_PASSPORT=0` |
-| endpoint pinned | no, so per-human caps are inactive |
 
 A mock passport registers on Self's **staging** hub while this gateway verifies against
 the **mainnet** hub, so a mock proof fails with `InvalidRoot: Onchain root does not exist`
@@ -180,15 +176,10 @@ npx --yes @celo/buy@0.5.0 verify hosted \
   --endpoint https://usebuy.ai/self/api/verify
 ```
 
-This step needs only the Self mobile app with the user's REAL passport, then scan the
-displayed QR code. Mock passports are rejected by this deployment: they register on
-Self's staging hub, and the gateway verifies against the mainnet hub, so a mock proof
-fails with `InvalidRoot: Onchain root does not exist`. No tunnel and no
-`cloudflared` — the gateway hosts the Self receiver, so nothing listens on the user's
-machine. This gateway hosts a receiver but does not **pin** one, so its 402 carries no
-`endpoint` field and there is nothing to copy out of a failed `buy curl` — use the URL
-above. Against a gateway that does pin, the 402's `extra.selfRequirements.endpoint` is
-authoritative and overrides it.
+This step needs only the Self mobile app and the user's passport: scan the displayed QR
+code. The gateway hosts the Self receiver, so nothing runs on the user's machine. Its 402
+carries no `endpoint` field, so use the URL above; when a gateway's 402 does carry
+`extra.selfRequirements.endpoint`, that value is authoritative.
 
 Only the user can complete this proof. If it is missing or stale, stop and ask them to
 run the command again. Retrying a purchase does not create or refresh an attestation.
@@ -335,11 +326,9 @@ change; always use the renewed response's `ip` and expect SSH to warn about a ch
 original creation. A completed script normally does not need renewal because its result
 is retained for polling.
 
-The paying wallet is the ownership check that binds today. A different wallet receives
-`403 not_your_lease`. The verified Self identity half of that ownership check is inactive
-while the per-human limits and stable server-side Self endpoint are disabled, so describe
-the current rule as wallet-only. Self verification is rechecked only when the VM type is
-in the attestation-gated tier.
+Renewal ownership is wallet-only: a different wallet receives `403 not_your_lease`,
+meaning a different address paid — the user's identity has not changed and re-verifying
+will not help. The verified Self identity half of that check is inactive.
 
 `200` with `unconfirmed: true` means the extension succeeded but the new deadline could
 not yet be read back. No refund is due. Poll for the confirmed deadline; this is not a
@@ -367,9 +356,8 @@ replacement merely because the response was lost. Preserve any receipt or transa
 information and tell the user what is known.
 
 Inspect local payment history with `buy receipts` (or
-`npx --yes @celo/buy@0.5.0 receipts`). It can show the time, target URL, amount, and network;
-some non-streamed entries also include a transaction hash. It is not full VM recovery
-today: streamed `buy curl` receipts do not retain the paid response, transaction hash,
-poll URL, instance, IP, or correlation ID. That limitation is known and tracked upstream.
-For CLI purchases, preserve the response with the private `tee` pattern above; do not retry
+`npx --yes @celo/buy@0.5.0 receipts`). It shows the time, target URL, amount, and network,
+and for some non-streamed entries a transaction hash. Streamed `buy curl` receipts do not
+retain the paid response, transaction hash, poll URL, instance, IP, or correlation ID, so
+for CLI purchases preserve the response with the private `tee` pattern above; do not retry
 a payment because recovery fields are absent from a receipt.
