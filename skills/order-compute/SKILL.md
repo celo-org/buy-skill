@@ -85,11 +85,15 @@ authoritative, and anything written here can age.
 These are standard on-demand VMs, never Spot. They run in `us-west1`, start with a
 one-hour lease, and may be renewed up to 24 hours total from creation.
 
-**Egress is restricted.** A leased VM can reach DNS (53), HTTP (80), HTTPS (443) and NTP
-(123), and nothing else — outbound SSH, SMTP and arbitrary TCP are denied. `apt`, `curl`,
-`git` over HTTPS and package registries work; anything else will hang rather than refuse.
-Inbound, only port 22 is open, and only on `/gcloud/ssh` purchases, which are the only
-ones given an external IP.
+**Egress is restricted, and a denied connection hangs instead of failing.** A leased VM
+can reach DNS (53), HTTP (80), HTTPS (443) and NTP (123), and nothing else — outbound
+SSH, SMTP and arbitrary TCP are silently dropped. `apt`, `curl`, `git` over HTTPS and
+package registries work. Anything else waits forever, inside a lease the user has already
+paid for, and the poll never reaches `done`. Wrap every outbound call in a script with an
+explicit timeout, for example `timeout 20 curl -sS https://example.com/api` or
+`timeout 5 bash -c 'cat < /dev/tcp/host/25'`, so a blocked port turns into an exit code
+the script can report rather than a lease that runs out. Inbound, only port 22 is open,
+and only on `/gcloud/ssh` purchases, which are the only ones given an external IP.
 
 Choose the smallest machine that fits:
 
@@ -111,6 +115,11 @@ Use the pinned release:
 npx --yes @celo/buy@0.5.0 setup --name demo
 ```
 
+`setup` prints `key: stored in OS keychain (legacy service=cpay)`, and the VMs this
+gateway creates are named `cpay-<transaction prefix>`. Both are leftovers of the product's
+earlier name and refer to `buy`; nothing has gone to a different service. Do not tell the
+user they installed the wrong tool.
+
 Creating a wallet writes a private key to the user's OS keychain. Do it only with their
 knowledge. Have the user fund the printed address with a small amount of USDC or USDT on
 Celo mainnet. The wallet does not need CELO because the gateway sponsor pays gas.
@@ -122,10 +131,14 @@ should have a ceiling that does not depend on the agent behaving:
 npx --yes @celo/buy@0.5.0 account cap demo 1.00
 ```
 
-**The amount is in USDC, not atomic units.** `1.00` means one dollar per day. A figure of
-1000 or more is refused unless `--force` is passed, because a large round number is far
-more likely a units mistake than an intent — and a cap only fails dangerously in one
-direction. `account list` shows the cap, `--clear` removes it.
+**The amount is in dollars, not atomic units.** `1.00` means one dollar per day. A figure
+of 1000 or more is refused unless `--force` is passed, because a large round number is
+far more likely a units mistake than an intent — and a cap only fails dangerously in one
+direction. `account list` shows the cap, `--clear` removes it. The confirmation says
+`USDC` (`daily spend cap for demo set to 1 USDC`), but the cap is stored as six-decimal
+atomic units with no token attached, so it applies to USDT purchases at the same rate. A
+"USDC" cap does not refuse a USDT purchase, and comparing a USDT balance against it is
+correct.
 
 Check the balance before quoting. The command differs by client, which is worth
 knowing before a purchase fails on funds:
@@ -237,19 +250,33 @@ Set `--max-amount` from the current quote rather than copying the example. Add
 contains the poll URL used to read the result. Delete it after the lease and retained-result
 window end.
 
+The 402 this gateway returns carries `"x402Version": 1`. Celo's public facilitator at
+`api.x402.celo.org`, and resource servers built on `@x402/express`, issue version 2.
+The buy CLI and MCP server handle this gateway's challenge; a client written against
+the other version may fail at parse time with no hint that two versions exist, so name
+the version when a third-party client cannot read the challenge.
+
 ## Collect the result
 
 A successful purchase returns a transaction hash, instance name, expiry, and a signed
 `poll` URL. Poll that exact URL with an ordinary free GET; do not reconstruct it from the
 transaction hash.
 
-Wait about 15 seconds between polls. Interpret the response as follows:
+Expect the paid call itself to take 15–45 seconds (settlement plus provisioning kickoff;
+longer when `npx` resolves the package cold) and `done` to arrive roughly 30 seconds
+after that for a short script. Wait about 15 seconds between polls. Interpret the
+response as follows:
 
 - missing or null `scriptStatus`: the VM is still starting or running (script route).
 - `scriptStatus: "not_requested"`: this is an SSH lease; no script was submitted.
 - `scriptStatus: "done"`: return `result` to the user.
 - `scriptStatus: "failed:<code>"`: return the captured result and exit code.
 - `vmStatus: "DELETED"`: the lease ended; a retained result may still be present.
+
+The paid response and the poll response do not share a shape for `zone`: the paid
+response returns `"zone":"us-west1-a"`, while the poll returns the full GCE URL ending
+in `/zones/us-west1-a`. Take `zone` from the paid response if you need it, and key on
+`vmStatus`, `scriptStatus`, and `result` from the poll — not on `zone`.
 
 The VM has outbound DNS, HTTP, HTTPS, and NTP, but no GCP service account or cloud
 credentials. Output is bounded, so send large artifacts to storage chosen by the user
