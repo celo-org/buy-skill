@@ -134,14 +134,32 @@ knowing before a purchase fails on funds:
 - **CLI**: `buy whoami`, which prints the address and every token balance. There is
   no `buy balance` subcommand.
 
-For agent clients, install the local MCP server:
+Fund it like a float, not a treasury, and say so to the user: `buy send`, the only way
+the CLI moves money *out* of the wallet, is an ordinary ERC-20 transfer paid for by the
+wallet itself, so it needs CELO for gas — the gateway's sponsor covers only x402
+settlements. A wallet funded with stablecoins alone, as documented, can buy through the
+gateway but cannot send its leftover balance anywhere until someone also sends it a
+little CELO. On `@celo/buy@0.5.0` that refusal is a pre-flight balance check that was
+never broadcast, even though its message says the transfer "may still have gone
+through" and the process exits 0; the nested `insufficient funds for gas` detail is the
+true cause.
+
+The MCP server is optional. The CLI performs every operation the tools do, so a host
+that cannot run it loses nothing but typed `maxAmount` fields. For agent clients that
+want it:
 
 ```sh
 npx --yes @celo/buy@0.5.0 mcp install --client all
 ```
 
 Restart the client after its MCP configuration changes. The MCP server uses the same
-keychain wallet; it does not expose the private key to the agent.
+keychain wallet; it does not expose the private key to the agent. If `mcp install`
+reports `could not register with claude, codex (see error above)` and nothing was
+printed above it, register it by hand with the client's own command, for Claude Code:
+
+```sh
+claude mcp add buy -- npx --yes @celo/buy@0.5.0 mcp serve
+```
 
 ## Obtain the Self attestation
 
@@ -215,6 +233,23 @@ buy_curl
 
 ## Buy through the CLI
 
+Four things about the `buy` command line on `0.5.0` that cost agents a failed call each:
+
+- **Global flags go before the subcommand.** `--json`, `--no-json`, `--account`,
+  `--verbose`, and `-s` are options of `buy` itself; `buy whoami --json` is refused with
+  `unknown option '--json'`, while `buy --json whoami` works. Every example here is
+  written in the working order.
+- **`buy skills` is not how you find this gateway.** It exits 1 with no output on this
+  release, and the registry it reads lists providers unrelated to compute. The endpoints
+  in this skill are the discovery path; do not spend calls on `buy skills`.
+- **`--verbose` prints nothing for a paid `curl`.** Do not rely on it for the quote, the
+  signing step, or the transaction hash; those come from the JSON response, which is why
+  the `tee` pattern below is mandatory.
+- **`amount_exceeds_max` mixes units.** Its message compares the challenge in atomic
+  units (`16753`) with the cap in decimal (`0.0001`); `details.required` and
+  `details.maxAmount` are both atomic. Convert before deciding by how much to raise
+  `--max-amount`, and never raise it past what the user approved.
+
 An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the paid retry:
 
 ```bash
@@ -247,7 +282,12 @@ Wait about 15 seconds between polls. Interpret the response as follows:
 
 - missing or null `scriptStatus`: the VM is still starting or running (script route).
 - `scriptStatus: "not_requested"`: this is an SSH lease; no script was submitted.
-- `scriptStatus: "done"`: return `result` to the user.
+- `scriptStatus: "done"`: return `result` to the user. **On this gateway `result` can
+  contain raw newlines that strict JSON parsers reject** (`Invalid control character` in
+  Python, a throw from `JSON.parse`, an error from `jq`); any multi-line script output
+  triggers it. Read the poll body as text and parse it tolerantly (Python
+  `json.loads(raw, strict=False)`), or extract `result` with a regex, and report the
+  output to the user rather than the parse error. The payment and the VM are fine.
 - `scriptStatus: "failed:<code>"`: return the captured result and exit code.
 - `vmStatus: "DELETED"`: the lease ended; a retained result may still be present.
 
