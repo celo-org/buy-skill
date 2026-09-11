@@ -15,6 +15,21 @@ https://usebuy.ai/gcloud/vm
 It settles real USDC or USDT on Celo mainnet. Payment is irreversible. Use a local
 sandbox instead when it can do the work safely.
 
+## Fast path
+
+A purchase needs four calls, and only one of them costs money:
+
+1. `GET https://usebuy.ai/gcloud/catalog` — free. One response lists every machine type
+   with its price, RAM, guaranteed vCPU share, and whether Self attestation is required,
+   plus the accepted tokens. Choose the type from this; do not probe each type with a POST.
+2. Quote the exact body once (`buy_pay_quote`, or an unpaid `curl` POST) — free. This
+   confirms the price for that body and is the only place to read `maxAmountRequired`.
+3. Pay once with the same body (`buy_curl`, or `buy curl`).
+4. Poll the returned URL with a free GET until `scriptStatus` is `done`.
+
+Everything below explains each step. Do not add calls between them — each extra probe
+adds latency for the user, and an extra *paid* call is a second charge.
+
 ## Non-negotiable boundaries
 
 - Quote before paying. The request body determines the price.
@@ -58,14 +73,14 @@ they hand back:
 `script` is required on `/gcloud/vm` and limited to 4 KiB. `sshKey` is required on
 `/gcloud/ssh`. `machineType` is optional on both and defaults to `e2-micro`.
 
-| Type | vCPU share | `nproc` | RAM | 1h quote | Attestation |
+| Type | vCPU share | `nproc` | RAM | 1h quote (USD) | Attestation |
 |---|---:|---:|---:|---:|---|
-| `e2-micro` | 0.25 | 2 | 1 GiB | 0.016753 USDC or USDT | not required |
-| `e2-small` | 0.5 | 2 | 2 GiB | 0.033506 USDC or USDT | not required |
-| `e2-medium` | 1 | 2 | 4 GiB | 0.067011 USDC or USDT | not required |
-| `e2-standard-2` | 2 | 2 | 8 GiB | 0.134023 USDC or USDT | **required** |
-| `e2-standard-4` | 4 | 4 | 16 GiB | 0.268046 USDC or USDT | **required** |
-| `e2-standard-8` | 8 | 8 | 32 GiB | 0.536091 USDC or USDT | **required** |
+| `e2-micro` | 0.25 | 2 | 1 GiB | 0.016753 | not required |
+| `e2-small` | 0.5 | 2 | 2 GiB | 0.033506 | not required |
+| `e2-medium` | 1 | 2 | 4 GiB | 0.067011 | not required |
+| `e2-standard-2` | 2 | 2 | 8 GiB | 0.134023 | **required** |
+| `e2-standard-4` | 4 | 4 | 16 GiB | 0.268046 | **required** |
+| `e2-standard-8` | 8 | 8 | 32 GiB | 0.536091 | **required** |
 
 **The shared-core types report `nproc=2`, while standard types report their full CPU
 count.** For shared-core machines, E2 exposes two logical CPUs while guaranteeing only
@@ -81,6 +96,14 @@ to a standard group list — but that grants nothing, because there is no Docker
 
 Prices above are indicative; the catalog and the 402 quote for the exact body are
 authoritative, and anything written here can age.
+
+**Tokens.** Every price is the same in each accepted stablecoin, all with six decimals.
+The pinned CLI can sign for two of them: `USDC` (the default) and `USDT`. These are the
+only valid values for `--token` on the CLI and `token` on `buy_curl`. The catalog's
+`tokens` list and the 402's `accepts` may carry a third entry, Tether America USD, which
+the gateway accepts but `@celo/buy@0.5.0` has no address for — do not offer it to the
+user, and do not pass it as a token; the CLI rejects it. Pick the token the wallet
+actually holds, and say which one you chose when you report the payment.
 
 These are standard on-demand VMs, never Spot. They run in `us-west1`, start with a
 one-hour lease, and may be renewed up to 24 hours total from creation.
@@ -114,6 +137,13 @@ npx --yes @celo/buy@0.5.0 setup --name demo
 Creating a wallet writes a private key to the user's OS keychain. Do it only with their
 knowledge. Have the user fund the printed address with a small amount of USDC or USDT on
 Celo mainnet. The wallet does not need CELO because the gateway sponsor pays gas.
+
+`buy` always pays from a wallet it generated: `setup` has no import option and `account`
+cannot adopt an existing key. If the user has already declared an agent wallet somewhere
+else — a registration form, a leaderboard, an allowlist — tell them the `buy` address
+is a second wallet and should be declared there too, so on-chain receipts can be matched
+to them. Funding it from that other wallet is an ordinary ERC-20 transfer made outside
+this CLI.
 
 Set a daily spend cap before the first purchase. An agent buying on someone's behalf
 should have a ceiling that does not depend on the agent behaving:
@@ -149,8 +179,10 @@ keychain wallet; it does not expose the private key to the agent.
 `e2-micro`, `e2-small`, and `e2-medium` are buyable with no proof at all, on both routes —
 the gateway requires an attestation only above a spend threshold, so
 someone without a compatible identity document can still use the service. Check before
-sending a user through verification: if the 402 challenge carries no
-`extra.selfRequirements`, none is needed.
+sending a user through verification: read `attestationRequired` for the chosen type from
+`GET /gcloud/catalog`, which answers for every size in one free call. The 402 quote
+confirms it for the exact body — a challenge with no `extra.selfRequirements` needs no
+attestation — but do not use the 402 as the way to discover it across types.
 
 Where one IS required, these are the live requirements, as served by the gateway today:
 
@@ -211,7 +243,9 @@ buy_curl
 ```
 
 `maxAmount` is in atomic token units; USDC and USDT both use six decimals. Omit any
-`sandbox` field. The default token is USDC; honor an explicit request for USDT.
+`sandbox` field. The default token is USDC; pass `token: "USDT"` when the user chose USDT
+or when the wallet holds USDT but not USDC. Those two are the only tokens the pinned
+release can sign for.
 
 ## Buy through the CLI
 
@@ -340,7 +374,7 @@ failed renewal.
 |---|---|---|
 | `400` | No | Correct the body, script, or machine type. |
 | `404` on `/gcloud/ssh` | No | That deployment runs `BUY_GCE_ALLOW_SSH=0`. Use `/gcloud/vm`. |
-| `insufficient_balance` (client-side balance check) | No | The wallet cannot cover the price. For a KYC-gated request, Self attestation is checked first; an unverified wallet may see `self_attestation_required` before the balance check. Once the attestation is available, no payment is signed or sent. Fund the wallet, then retry. There is no mainnet faucet.
+| `insufficient_balance` (client-side balance check) | No | The wallet cannot cover the price **in the selected token**. The message names only that token (USDC unless `--token` was set), even when the wallet holds enough USDT: check `whoami` / `buy_balance` first, and if another accepted token covers the price, retry with `--token USDT` (CLI) or `token: "USDT"` (MCP) instead of asking the user to fund. For a KYC-gated request, Self attestation is checked first; an unverified wallet may see `self_attestation_required` before the balance check. No payment is signed or sent. Only when no accepted token covers the price, have the user fund the wallet. There is no mainnet faucet.
 | `402 verify_payment_failed` | No | Ask the user to fund or select the correct wallet/token. |
 | `402 verify_self_failed` | No | Ask the user to rerun `verify hosted --endpoint https://usebuy.ai/self/api/verify`. |
 | `403` or `409` on renewal | No | Follow the returned ownership, lifetime, or transition error. |
