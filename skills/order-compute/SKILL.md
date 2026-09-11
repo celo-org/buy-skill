@@ -239,8 +239,8 @@ Four things about the `buy` command line on `0.5.0` that cost agents a failed ca
   `--verbose`, and `-s` are options of `buy` itself; `buy whoami --json` is refused with
   `unknown option '--json'`, while `buy --json whoami` works. Every example here is
   written in the working order.
-- **`buy skills` is not how you find this gateway.** It exits 1 with no output on this
-  release, and the registry it reads lists providers unrelated to compute. The endpoints
+- **`buy skills` is not how you find this gateway.** On this release it exits with no
+  output at all, and the registry it reads lists providers unrelated to compute. The endpoints
   in this skill are the discovery path; do not spend calls on `buy skills`.
 - **`--verbose` prints nothing for a paid `curl`.** Do not rely on it for the quote, the
   signing step, or the transaction hash; those come from the JSON response, which is why
