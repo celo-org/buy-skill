@@ -1,0 +1,62 @@
+# Does this skill still describe the gateway people are actually buying from?
+#
+# The skill tells an agent how to spend real money, and every fact in it that
+# can go stale — API prefix, machine types, prices, tokens — is served live by
+# GET /catalog, which the skill itself documents as free and side-effect free.
+# Nothing here spends anything or needs a secret.
+#
+# This checks against PRODUCTION and the PUBLISHED package, deliberately. The
+# upstream repository's own sync check compares this file against a branch,
+# which cannot see either: a branch can rename an API prefix months before the
+# gateway serves it, and accept a token before any release ships an address for
+# it. Both happened. A reader following the skill would have hit 404s and a
+# --token the CLI rejects.
+#
+# Runs on PRs so a bad sync is caught before it is published, and daily so a
+# gateway change is caught even when nobody touches this repository.
+name: gateway reality
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gateway-reality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matches-production:
+    name: skill matches the deployed gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The pinned version is read out of the skill rather than hardcoded here,
+      # so bumping the pin cannot silently leave this checking the old package.
+      - name: install the @celo/buy-core version the skill pins
+        run: |
+          set -euo pipefail
+          version="$(grep -ohE '@celo/buy@[A-Za-z0-9._-]+' skills/order-compute/SKILL.md \
+                     | sed 's/.*@//' | sort -u)"
+          if [ "$(printf '%s\n' "$version" | wc -l)" -ne 1 ] || [ -z "$version" ]; then
+            echo "::error::the skill must pin exactly one @celo/buy version; found: $version"
+            exit 1
+          fi
+          echo "skill pins @celo/buy@$version"
+          npm install --no-save "@celo/buy-core@$version"
+
+      - name: compare the skill with the live catalog
+        run: node scripts/check-against-gateway.mjs
