@@ -1,6 +1,6 @@
 ---
 name: use-api-gateway
-description: This skill should be used when a user or agent wants to discover or buy an API through the provider-neutral buy gateway, including searching X posts or reading LinkedIn profile and company posts. It covers catalog discovery, exact quoting, approval, payment, and safe failure handling.
+description: Use when a user or agent wants to discover or buy browser access or an X, Instagram, TikTok, Reddit, YouTube, LinkedIn, or flight API through the provider-neutral buy gateway. Covers live catalog discovery, bounded result bundles, exact quoting, approval, payment, and safe failure handling.
 ---
 
 # Use the buy API gateway
@@ -10,8 +10,8 @@ Discover and buy API calls from the provider-neutral gateway at
 settles real stablecoin payments on Celo mainnet.
 
 Start with the live catalog instead of assuming a provider, route, request schema, or
-price. The first catalog includes X post search and LinkedIn profile and company posts,
-but the gateway can add more capabilities without changing this workflow.
+price. It currently publishes one browser rental plus 170 inspected data APIs, and can
+change without changing this workflow.
 
 ## Non-negotiable boundaries
 
@@ -65,21 +65,36 @@ Fetch the catalog with an ordinary, free GET:
 curl --fail --silent --show-error https://gateway.usebuy.ai/v1/catalog
 ```
 
-Read each capability's `available`, `method`, `url`, `inputSchema`, and `price` fields.
+Read each capability's `available`, `method`, `url`, `inputSchema`, and `price` or
+`priceOptions` fields.
 Select an available capability whose description matches the user's request. Build only
 fields allowed by its current `inputSchema`; the gateway rejects extra provider-specific
 inputs.
 
-The initial capabilities are:
+The current data groups are:
 
-| Intent | Capability ID |
-|---|---|
-| Search public X posts | `x.posts.search` |
-| Read public posts from a LinkedIn profile | `linkedin.profile.posts` |
-| Read public posts from a LinkedIn company | `linkedin.company.posts` |
+| Group | APIs |
+|---|---:|
+| X | 19 |
+| Instagram | 36 |
+| TikTok | 33 |
+| Reddit | 22 |
+| YouTube | 32 |
+| LinkedIn | 25 |
+| Flights | 3 |
 
-Treat this table as orientation only. Treat the live catalog as the source of truth for
-availability and inputs.
+China Southern is intentionally excluded. Treat this table as orientation only; use the
+live descriptions and schemas to select the actual capability.
+
+The original short routes use simple top-level request bodies. Generated routes normally
+accept the inspected input envelope, such as `{"queryParams": {...}}` or
+`{"body": {...}}`. Do not flatten or rename those fields.
+
+When `pricingModel` is `fixed_result_bundle`, choose one advertised `maxResults` value
+and include it in the exact request body. This is a hard upstream limit and a fixed price,
+not an estimate: the payment is not prorated if fewer results are returned. Never add or
+modify provider limit fields that are absent from the public `inputSchema`; the gateway
+sets them from `maxResults`.
 
 ## Quote and buy through MCP
 
