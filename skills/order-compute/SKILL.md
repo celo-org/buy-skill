@@ -108,7 +108,7 @@ The public package requires Node.js 20 or newer and does not require repository 
 Use the pinned release:
 
 ```sh
-npx --yes @celo/buy@0.5.1 setup --name demo
+npx --yes @celo/buy@0.5.2 setup --name demo
 ```
 
 Creating a wallet writes a private key to the user's OS keychain. Do it only with their
@@ -119,7 +119,7 @@ Set a daily spend cap before the first purchase. An agent buying on someone's be
 should have a ceiling that does not depend on the agent behaving:
 
 ```sh
-npx --yes @celo/buy@0.5.1 account cap demo 1.00
+npx --yes @celo/buy@0.5.2 account cap demo 1.00
 ```
 
 **The amount is in USDC, not atomic units.** `1.00` means one dollar per day. A figure of
@@ -137,7 +137,7 @@ knowing before a purchase fails on funds:
 For agent clients, install the local MCP server:
 
 ```sh
-npx --yes @celo/buy@0.5.1 mcp install --client all
+npx --yes @celo/buy@0.5.2 mcp install --client all
 ```
 
 Restart the client after its MCP configuration changes. The MCP server uses the same
@@ -172,7 +172,7 @@ refuse it.
 Those scope, age, and OFAC values are CLI defaults. The user must run:
 
 ```sh
-npx --yes @celo/buy@0.5.1 verify hosted \
+npx --yes @celo/buy@0.5.2 verify hosted \
   --endpoint https://usebuy.ai/self/api/verify
 ```
 
@@ -222,7 +222,7 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
   umask 077
   set -o pipefail
   response_file=$(mktemp ./buy-vm.XXXXXX) || exit
-  npx --yes @celo/buy@0.5.1 --verbose curl --max-amount 0.02 \
+  npx --yes @celo/buy@0.5.2 --verbose curl --max-amount 0.02 \
     -X POST \
     --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
     https://usebuy.ai/google/vm | tee "$response_file"
@@ -261,7 +261,7 @@ rather than printing them.
 injected, instead of running a script. Quote it exactly like the script route. With the CLI, use:
 
 ```sh
-npx --yes @celo/buy@0.5.1 --verbose curl --max-amount 0.07 \
+npx --yes @celo/buy@0.5.2 --verbose curl --max-amount 0.07 \
   -X POST \
   --data '{"sshKey":"ssh-ed25519 AAAA… user@host","machineType":"e2-micro"}' \
   https://usebuy.ai/google/ssh
@@ -356,7 +356,7 @@ replacement merely because the response was lost. Preserve any receipt or transa
 information and tell the user what is known.
 
 Inspect local payment history with `buy receipts` (or
-`npx --yes @celo/buy@0.5.1 receipts`). It shows the time, target URL, amount, and network,
+`npx --yes @celo/buy@0.5.2 receipts`). It shows the time, target URL, amount, and network,
 and for some non-streamed entries a transaction hash. Streamed `buy curl` receipts do not
 retain the paid response, transaction hash, poll URL, instance, IP, or correlation ID, so
 for CLI purchases preserve the response with the private `tee` pattern above; do not retry
