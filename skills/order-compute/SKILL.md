@@ -9,10 +9,10 @@ Buy a real, short-lived Debian VM that runs one script as root and returns its o
 public beta gateway is:
 
 ```text
-https://usebuy.ai/gcloud/vm
+https://usebuy.ai/google/vm
 ```
 
-It settles real USDC or USDT on Celo mainnet. Payment is irreversible. Use a local
+It settles real USDC, USDT or USAT on Celo mainnet. Payment is irreversible. Use a local
 sandbox instead when it can do the work safely.
 
 ## Non-negotiable boundaries
@@ -26,8 +26,8 @@ sandbox instead when it can do the work safely.
 - Report the paid amount, token, transaction hash, instance, expiry, and poll URL.
 - Preserve the paid response. The poll URL is a capability and `buy receipts` does not
   retain it for streamed CLI calls.
-- SSH is a second purchase route, not a flag on `/gcloud/vm`. It is enabled on the public
-  deployment. Quote and buy `/gcloud/ssh` for it, and tell the user an interactive session
+- SSH is a second purchase route, not a flag on `/google/vm`. It is enabled on the public
+  deployment. Quote and buy `/google/ssh` for it, and tell the user an interactive session
   bills egress to the operator, so they should close it when done.
 
 ## What is available
@@ -36,10 +36,10 @@ Before choosing a machine type or calculating a payment, query the live catalog.
 CLI, issue a free `GET` request to:
 
 ```text
-https://usebuy.ai/gcloud/catalog
+https://usebuy.ai/google/catalog
 ```
 
-`GET /gcloud/catalog` is free and side-effect free. Use its `machineTypes` entries for
+`GET /google/catalog` is free and side-effect free. Use its `machineTypes` entries for
 the currently supported VM types, guaranteed vCPU share, guest CPU count, memory, disk,
 exact lease price, and whether Self attestation is required. Use its `network`, `region`,
 `tokens`, `leaseSeconds`, and `maxTotalLeaseSeconds` fields for the current service
@@ -52,20 +52,20 @@ they hand back:
 
 | Route | Body | You get |
 |---|---|---|
-| `POST /gcloud/vm` | `{"script":"…","machineType":"…"}` | the script's stdout, via the poll URL |
-| `POST /gcloud/ssh` | `{"sshKey":"ssh-ed25519 …","machineType":"…"}` | an external IP and an `ssh` command |
+| `POST /google/vm` | `{"script":"…","machineType":"…"}` | the script's stdout, via the poll URL |
+| `POST /google/ssh` | `{"sshKey":"ssh-ed25519 …","machineType":"…"}` | an external IP and an `ssh` command |
 
-`script` is required on `/gcloud/vm` and limited to 4 KiB. `sshKey` is required on
-`/gcloud/ssh`. `machineType` is optional on both and defaults to `e2-micro`.
+`script` is required on `/google/vm` and limited to 4 KiB. `sshKey` is required on
+`/google/ssh`. `machineType` is optional on both and defaults to `e2-micro`.
 
-| Type | vCPU share | `nproc` | RAM | 1h quote | Attestation |
+| Type | vCPU share | `nproc` | RAM | 1h quote (USDC, USDT or USAT) | Attestation |
 |---|---:|---:|---:|---:|---|
-| `e2-micro` | 0.25 | 2 | 1 GiB | 0.016753 USDC or USDT | not required |
-| `e2-small` | 0.5 | 2 | 2 GiB | 0.033506 USDC or USDT | not required |
-| `e2-medium` | 1 | 2 | 4 GiB | 0.067011 USDC or USDT | not required |
-| `e2-standard-2` | 2 | 2 | 8 GiB | 0.134023 USDC or USDT | **required** |
-| `e2-standard-4` | 4 | 4 | 16 GiB | 0.268046 USDC or USDT | **required** |
-| `e2-standard-8` | 8 | 8 | 32 GiB | 0.536091 USDC or USDT | **required** |
+| `e2-micro` | 0.25 | 2 | 1 GiB | 0.016753 | not required |
+| `e2-small` | 0.5 | 2 | 2 GiB | 0.033506 | not required |
+| `e2-medium` | 1 | 2 | 4 GiB | 0.067011 | not required |
+| `e2-standard-2` | 2 | 2 | 8 GiB | 0.134023 | **required** |
+| `e2-standard-4` | 4 | 4 | 16 GiB | 0.268046 | **required** |
+| `e2-standard-8` | 8 | 8 | 32 GiB | 0.536091 | **required** |
 
 **The shared-core types report `nproc=2`, while standard types report their full CPU
 count.** For shared-core machines, E2 exposes two logical CPUs while guaranteeing only
@@ -88,7 +88,7 @@ one-hour lease, and may be renewed up to 24 hours total from creation.
 **Egress is restricted.** A leased VM can reach DNS (53), HTTP (80), HTTPS (443) and NTP
 (123), and nothing else — outbound SSH, SMTP and arbitrary TCP are denied. `apt`, `curl`,
 `git` over HTTPS and package registries work; anything else will hang rather than refuse.
-Inbound, only port 22 is open, and only on `/gcloud/ssh` purchases, which are the only
+Inbound, only port 22 is open, and only on `/google/ssh` purchases, which are the only
 ones given an external IP.
 
 Choose the smallest machine that fits:
@@ -108,18 +108,18 @@ The public package requires Node.js 20 or newer and does not require repository 
 Use the pinned release:
 
 ```sh
-npx --yes @celo/buy@0.5.0 setup --name demo
+npx --yes @celo/buy@0.5.1 setup --name demo
 ```
 
 Creating a wallet writes a private key to the user's OS keychain. Do it only with their
-knowledge. Have the user fund the printed address with a small amount of USDC or USDT on
+knowledge. Have the user fund the printed address with a small amount of USDC, USDT or USAT on
 Celo mainnet. The wallet does not need CELO because the gateway sponsor pays gas.
 
 Set a daily spend cap before the first purchase. An agent buying on someone's behalf
 should have a ceiling that does not depend on the agent behaving:
 
 ```sh
-npx --yes @celo/buy@0.5.0 account cap demo 1.00
+npx --yes @celo/buy@0.5.1 account cap demo 1.00
 ```
 
 **The amount is in USDC, not atomic units.** `1.00` means one dollar per day. A figure of
@@ -137,7 +137,7 @@ knowing before a purchase fails on funds:
 For agent clients, install the local MCP server:
 
 ```sh
-npx --yes @celo/buy@0.5.0 mcp install --client all
+npx --yes @celo/buy@0.5.1 mcp install --client all
 ```
 
 Restart the client after its MCP configuration changes. The MCP server uses the same
@@ -172,7 +172,7 @@ refuse it.
 Those scope, age, and OFAC values are CLI defaults. The user must run:
 
 ```sh
-npx --yes @celo/buy@0.5.0 verify hosted \
+npx --yes @celo/buy@0.5.1 verify hosted \
   --endpoint https://usebuy.ai/self/api/verify
 ```
 
@@ -191,7 +191,7 @@ used for the purchase:
 
 ```text
 buy_pay_quote
-  url:    https://usebuy.ai/gcloud/vm
+  url:    https://usebuy.ai/google/vm
   method: POST
   body:   "{\"script\":\"uname -a; nproc\",\"machineType\":\"e2-micro\"}"
 ```
@@ -204,14 +204,14 @@ Then reuse the same URL, method, and body:
 
 ```text
 buy_curl
-  url:       https://usebuy.ai/gcloud/vm
+  url:       https://usebuy.ai/google/vm
   method:    POST
   body:      "{\"script\":\"uname -a; nproc\",\"machineType\":\"e2-micro\"}"
   maxAmount: "<maxAmountRequired from the quote>"
 ```
 
-`maxAmount` is in atomic token units; USDC and USDT both use six decimals. Omit any
-`sandbox` field. The default token is USDC; honor an explicit request for USDT.
+`maxAmount` is in atomic token units; USDC, USDT and USAT all use six decimals. Omit any
+`sandbox` field. The default token is USDC; honor an explicit request for USDT or USAT.
 
 ## Buy through the CLI
 
@@ -222,10 +222,10 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
   umask 077
   set -o pipefail
   response_file=$(mktemp ./buy-vm.XXXXXX) || exit
-  npx --yes @celo/buy@0.5.0 --verbose curl --max-amount 0.02 \
+  npx --yes @celo/buy@0.5.1 --verbose curl --max-amount 0.02 \
     -X POST \
     --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
-    https://usebuy.ai/gcloud/vm | tee "$response_file"
+    https://usebuy.ai/google/vm | tee "$response_file"
   response_status=$?
   printf 'Private response saved to %s\n' "$response_file" >&2
   exit "$response_status"
@@ -233,7 +233,7 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
 ```
 
 Set `--max-amount` from the current quote rather than copying the example. Add
-`--token USDT` only when the user chose USDT. Keep the generated response file private: it
+`--token USDT` or `--token USAT` only when the user chose that token. Keep the generated response file private: it
 contains the poll URL used to read the result. Delete it after the lease and retained-result
 window end.
 
@@ -257,21 +257,21 @@ rather than printing them.
 
 ## Buy an SSH session instead
 
-`POST /gcloud/ssh` sells the same machine with an external IP and the caller's public key
+`POST /google/ssh` sells the same machine with an external IP and the caller's public key
 injected, instead of running a script. Quote it exactly like the script route. With the CLI, use:
 
 ```sh
-npx --yes @celo/buy@0.5.0 --verbose curl --max-amount 0.07 \
+npx --yes @celo/buy@0.5.1 --verbose curl --max-amount 0.07 \
   -X POST \
   --data '{"sshKey":"ssh-ed25519 AAAA… user@host","machineType":"e2-micro"}' \
-  https://usebuy.ai/gcloud/ssh
+  https://usebuy.ai/google/ssh
 ```
 
 With MCP, use:
 
 ```text
 buy_pay_quote
-  url:    https://usebuy.ai/gcloud/ssh
+  url:    https://usebuy.ai/google/ssh
   method: POST
   body:   "{\"sshKey\":\"ssh-ed25519 AAAA… user@host\",\"machineType\":\"e2-micro\"}"
 ```
@@ -285,10 +285,10 @@ fields, plus `ip`, `user`, and a ready-made `ssh` command:
 
 ```json
 {"instance":"<instance>","ip":"35.212.153.43","user":"buy","ssh":"ssh buy@35.212.153.43",
- "expiresAt":"…","poll":"https://usebuy.ai/gcloud/vm/<token>"}
+ "expiresAt":"…","poll":"https://usebuy.ai/google/vm/<token>"}
 ```
 
-The poll URL stays under `/gcloud/vm/<token>` for both routes, and so does renewal.
+The poll URL stays under `/google/vm/<token>` for both routes, and so does renewal.
 `vmStatus` reaches `RUNNING` before sshd accepts connections; allow roughly 20 seconds more,
 then connect with the matching private key.
 
@@ -297,7 +297,7 @@ GCP recycles these external IPs, so a later lease can land on one and trip
 `-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null` when that happens.
 
 Egress is the one cost this service does not cap, and an interactive session is where it
-runs up: the traffic bills the gateway operator, not the buyer. Prefer `/gcloud/vm` when a
+runs up: the traffic bills the gateway operator, not the buyer. Prefer `/google/vm` when a
 script would do, and buy SSH only when the user actually wants a shell.
 
 ## Renew only when needed
@@ -306,7 +306,7 @@ Use the original poll token:
 
 ```text
 buy_pay_quote
-  url:    https://usebuy.ai/gcloud/vm/<poll-token>/renew
+  url:    https://usebuy.ai/google/vm/<poll-token>/renew
   method: POST
 ```
 
@@ -314,7 +314,7 @@ Then use the renewal quote's atomic amount:
 
 ```text
 buy_curl
-  url:       https://usebuy.ai/gcloud/vm/<poll-token>/renew
+  url:       https://usebuy.ai/google/vm/<poll-token>/renew
   method:    POST
   maxAmount: "<maxAmountRequired from the renewal quote>"
 ```
@@ -339,7 +339,7 @@ failed renewal.
 | Response | Charged? | Action |
 |---|---|---|
 | `400` | No | Correct the body, script, or machine type. |
-| `404` on `/gcloud/ssh` | No | That deployment runs `BUY_GCE_ALLOW_SSH=0`. Use `/gcloud/vm`. |
+| `404` on `/google/ssh` | No | That deployment runs `BUY_GCE_ALLOW_SSH=0`. Use `/google/vm`. |
 | `insufficient_balance` (client-side balance check) | No | The wallet cannot cover the price. For a KYC-gated request, Self attestation is checked first; an unverified wallet may see `self_attestation_required` before the balance check. Once the attestation is available, no payment is signed or sent. Fund the wallet, then retry. There is no mainnet faucet.
 | `402 verify_payment_failed` | No | Ask the user to fund or select the correct wallet/token. |
 | `402 verify_self_failed` | No | Ask the user to rerun `verify hosted --endpoint https://usebuy.ai/self/api/verify`. |
@@ -356,7 +356,7 @@ replacement merely because the response was lost. Preserve any receipt or transa
 information and tell the user what is known.
 
 Inspect local payment history with `buy receipts` (or
-`npx --yes @celo/buy@0.5.0 receipts`). It shows the time, target URL, amount, and network,
+`npx --yes @celo/buy@0.5.1 receipts`). It shows the time, target URL, amount, and network,
 and for some non-streamed entries a transaction hash. Streamed `buy curl` receipts do not
 retain the paid response, transaction hash, poll URL, instance, IP, or correlation ID, so
 for CLI purchases preserve the response with the private `tee` pattern above; do not retry
