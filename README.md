@@ -37,8 +37,8 @@ A skill is guidance, not capability. The agent also needs the tools it describes
 `buy_pay_quote`, `buy_curl`, `buy_balance`, `buy_whoami`, `buy_verify_status`:
 
 ```sh
-npx --yes @celo/buy@0.5.0 setup --name buy      # creates a wallet in your OS keychain
-npx --yes @celo/buy@0.5.0 mcp install --client all
+npx --yes @celo/buy@0.5.1 setup --name buy      # creates a wallet in your OS keychain
+npx --yes @celo/buy@0.5.1 mcp install --client all
 ```
 
 Restart the agent afterwards so it picks up the new MCP configuration. The server signs
@@ -71,7 +71,7 @@ server, the gateway, and payments. File it here whatever broke; maintainers rout
 It searches for duplicates, fills the right form, and shows you the exact text before
 anything is posted.
 
-One thing to check before you paste: a poll URL — `https://usebuy.ai/gcloud/vm/<token>` — is
+One thing to check before you paste: a poll URL (`https://usebuy.ai/google/vm/<token>`) is
 a bearer capability. Anyone who reads it can read your result and renew your lease at your
 expense. Redact the token. The same goes for private keys, seed phrases, SSH private keys,
 and anything Self handed you. A transaction hash is already public on-chain and is the most
