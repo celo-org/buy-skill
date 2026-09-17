@@ -129,7 +129,7 @@ The other forms use their own ids — `where`, `says`, `reality`, `impact`, `ver
 Collect the environment rather than asking the user to recite it:
 
 ```sh
-npx --yes @celo/buy@0.5.0 --version
+npx --yes @celo/buy@0.5.2 --version
 node --version
 uname -srm
 date -u +'%Y-%m-%dT%H:%M:%SZ'
@@ -137,7 +137,7 @@ date -u +'%Y-%m-%dT%H:%M:%SZ'
 
 Add the MCP client name and version when the failure came through an MCP tool. `--version`
 may not be recognised on every release; if it is not, report the version the user actually
-invoked — `@celo/buy@0.5.0` — and say that is what was pinned, not what resolved.
+invoked — `@celo/buy@0.5.2` — and say that is what was pinned, not what resolved.
 
 ### Was it charged?
 
