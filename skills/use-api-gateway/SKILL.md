@@ -66,7 +66,9 @@ curl --fail --silent --show-error https://gateway.usebuy.ai/v1/catalog
 ```
 
 Read each capability's `available`, `method`, `url`, `inputSchema`, and `price` or
-`priceOptions` fields.
+`priceOptions` fields. Each capability also carries a flat `platform` facet (for example
+`x`, `instagram`, `tiktok`, `reddit`, `youtube`, `linkedin`, `flights`, `browser`) — group
+or filter on it instead of parsing ids or URLs.
 Select an available capability whose description matches the user's request. Build only
 fields allowed by its current `inputSchema`; the gateway rejects extra provider-specific
 inputs.
