@@ -37,8 +37,8 @@ A skill is guidance, not capability. The agent also needs the tools it describes
 `buy_pay_quote`, `buy_curl`, `buy_balance`, `buy_whoami`, `buy_verify_status`:
 
 ```sh
-npx --yes @celo/buy@0.5.2 setup --name buy      # creates a wallet in your OS keychain
-npx --yes @celo/buy@0.5.2 mcp install --client all
+npx --yes @celo/buy@0.6.0 setup --name buy      # creates a wallet in your OS keychain
+npx --yes @celo/buy@0.6.0 mcp install --client all
 ```
 
 Restart the agent afterwards so it picks up the new MCP configuration. The server signs
