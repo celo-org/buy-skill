@@ -240,11 +240,32 @@ window end.
 
 ## Collect the result
 
-A successful purchase returns a transaction hash, instance name, expiry, and a signed
-`poll` URL. Poll that exact URL with an ordinary free GET; do not reconstruct it from the
-transaction hash.
+**Expect the paid request to block for about a minute.** The payment is signed and settled
+at the start of that window, and the gateway returns nothing until the VM is provisioned;
+observed waits run 45 to 75 seconds with no output on either stream. Do not interrupt it:
+a Ctrl-C after signing leaves a charged VM whose poll URL was never received. Run the paid
+`curl` only with stdout redirected, as in the `tee` pattern above; with `--verbose` on a
+terminal the streamed body has been observed cut off inside the `poll` field.
 
-Wait about 15 seconds between polls. Interpret the response as follows:
+A successful purchase returns a transaction hash, instance name, expiry, and a signed
+`poll` URL. Poll that exact URL with an ordinary free GET.
+
+**The poll URL cannot be recovered or rebuilt.** It is not derived from the transaction
+hash or the instance name: `https://usebuy.ai/google/vm/<instance>` answers
+`{"error":"not_found"}`, and `buy receipts` does not keep the URL. If the response was
+lost, the lease is paid for and unreachable; there is no recovery path, and buying again is
+a second purchase.
+
+Wait about 15 seconds between polls. A poll response looks like this; there is no
+top-level `status` field:
+
+```json
+{"instance":"cpay-5d9837674811","vmStatus":"RUNNING","scriptStatus":"done",
+ "result":"Linux cpay-5d9837674811 6.1.0-53-cloud-amd64 …\n2\n",
+ "expiresAt":"2026-09-19T12:40:04.474Z"}
+```
+
+Interpret it as follows:
 
 - missing or null `scriptStatus`: the VM is still starting or running (script route).
 - `scriptStatus: "not_requested"`: this is an SSH lease; no script was submitted.
@@ -252,8 +273,9 @@ Wait about 15 seconds between polls. Interpret the response as follows:
 - `scriptStatus: "failed:<code>"`: return the captured result and exit code.
 - `vmStatus: "DELETED"`: the lease ended; a retained result may still be present.
 
-The VM has outbound DNS, HTTP, HTTPS, and NTP, but no GCP service account or cloud
-credentials. Output is bounded, so send large artifacts to storage chosen by the user
+On the script route the script runs as `root`; the `buy` login with passwordless `sudo`
+belongs to the SSH route. The VM has outbound DNS, HTTP, HTTPS, and NTP, but no GCP service
+account or cloud credentials. Output is bounded, so send large artifacts to storage chosen by the user
 rather than printing them.
 
 ## Buy an SSH session instead
@@ -355,6 +377,21 @@ failed renewal.
 A network disconnect after sending a paid request is also ambiguous. Do not purchase a
 replacement merely because the response was lost. Preserve any receipt or transaction
 information and tell the user what is known.
+
+### After `settle_uncertain`
+
+The response says the payment may have settled, and nothing in the CLI resolves it:
+`buy receipts` records the attempt as `ambiguous [HTTP 500]` with no transaction hash. Do
+this, in order, and do not buy again while any step is open:
+
+1. Read the saved response file for a `transaction` or `poll` field. A lost response is not
+   evidence that nothing was paid.
+2. Run `buy receipts` and note the row and its correlation ID.
+3. Take the wallet address from `buy whoami` and look it up on a Celo block explorer; check
+   for an outgoing transfer of the quoted amount at the time of the request. A transfer that
+   exists is the payment, and its hash identifies the purchase.
+4. Report the amount, token, correlation ID, and transaction hash if any to the user, and
+   file feedback with those fields so the maintainers can look the settlement up.
 
 Inspect local payment history with `buy receipts` (or
 `npx --yes @celo/buy@0.7.0 receipts`). It shows the time, target URL, amount, and network,
