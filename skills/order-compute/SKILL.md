@@ -256,6 +256,35 @@ The VM has outbound DNS, HTTP, HTTPS, and NTP, but no GCP service account or clo
 credentials. Output is bounded, so send large artifacts to storage chosen by the user
 rather than printing them.
 
+## Buy through the CLI on Windows
+
+The CLI is developed on macOS and Linux. It works on Windows, with three things that have
+each cost a first-time user an hour:
+
+- **Schannel revocation errors.** A stock Windows `curl` may refuse `https://usebuy.ai`
+  with a certificate-revocation check failure. Pass `--ssl-no-revoke` through `buy curl`,
+  or run the CLI under WSL, where the commands in this skill work unchanged.
+- **PowerShell 5.1 corrupts an inline JSON body.** The `buy.ps1` wrapper that npm installs
+  forwards arguments in a way that strips braces and quotes from `-d '{…}'`, and
+  `Out-File -Encoding utf8` prepends a byte-order mark that the console hides but the
+  gateway rejects with `400 body must be valid JSON`. Write the body to a file without a
+  BOM and let curl read it:
+
+  ```powershell
+  $body = '{"script":"uname -a; nproc","machineType":"e2-micro"}'
+  [IO.File]::WriteAllText("$PWD\body.json", $body, (New-Object Text.UTF8Encoding $false))
+  npx --yes @celo/buy@0.7.0 curl --max-amount 0.02 -X POST `
+    -H "content-type: application/json" -d "@body.json" `
+    https://usebuy.ai/google/vm | Tee-Object -FilePath response.json
+  ```
+
+  Global flags such as `--account` and `--verbose` go before `curl`; placed after the URL
+  they are forwarded to curl, which rejects them.
+- **Keep stdout and stderr apart.** The server body is stdout and the CLI's JSON error
+  envelope is stderr, and PowerShell 5.1 additionally wraps native stderr in a
+  `NativeCommandError` record. Redirecting `2>&1` into one file interleaves two objects that
+  both start with `"error"`. Capture stdout alone and read stderr separately.
+
 ## Buy an SSH session instead
 
 `POST /google/ssh` sells the same machine with an external IP and the caller's public key
