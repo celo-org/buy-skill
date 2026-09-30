@@ -165,8 +165,13 @@ gh issue list -R celo-org/buy-skill --state all --limit 20 \
 ```
 
 ```sh
-gh search issues --repo celo-org/buy-skill --state all --limit 20 "provision_failed"
+gh search issues --repo celo-org/buy-skill --limit 20 "provision_failed"
 ```
+
+The two commands take different flags. `gh issue list` needs `--state all` to include
+closed issues; `gh search issues` searches both states unless `--state open` or
+`--state closed` is passed, and rejects `--state all` outright. Do not copy the flag
+from one to the other.
 
 Without `gh`, hand the user a search URL:
 

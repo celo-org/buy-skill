@@ -238,10 +238,37 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
 )
 ```
 
-Set `--max-amount` from the current quote rather than copying the example. Add
-`--token USDT` or `--token USAT` only when the user chose that token. Keep the generated response file private: it
-contains the poll URL used to read the result. Delete it after the lease and retained-result
-window end.
+Set `--max-amount` from the current quote rather than copying the example. **`--max-amount`
+is a decimal token amount, while the quote's `maxAmountRequired` and the MCP `maxAmount`
+field are atomic.** A quote of `16753` atomic is `0.016753` USDC, so pass
+`--max-amount 0.016753` or a little more; `--max-amount 16753` would authorize 16,753 USDC.
+Add `--token USDT` or `--token USAT` only when the user chose that token. Keep the generated
+response file private: it contains the poll URL used to read the result. Delete it after
+the lease and retained-result window end.
+
+### Preview the price without paying
+
+There is no `buy quote` subcommand; `buy quote …` fails with `unknown command 'quote'`.
+The free preview is the 402 challenge itself, which any unpaid request receives and which
+needs no wallet:
+
+```sh
+curl -s -X POST -H 'content-type: application/json' \
+  --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
+  https://usebuy.ai/google/vm | jq '.accepts[] | {asset, maxAmountRequired, description}'
+```
+
+Each `accepts` entry is one token at the same atomic price. With MCP, `buy_pay_quote` does
+the same and never signs.
+
+### Read the outcome from the body, not the exit code
+
+On `0.7.0`, `buy curl` can exit `1` after a paid request that returned HTTP 200 with a
+complete body on stdout and nothing on stderr; it has been observed on `/google/ssh` and on
+renewal. A complete JSON response carrying `transaction` and `poll` means the payment
+settled and the purchase exists, whatever the exit code says. Never treat a non-zero exit
+alone as a failed purchase, and never buy again because of one. Check the saved response
+file first, then `buy receipts`.
 
 ## Collect the result
 
@@ -282,6 +309,40 @@ On the script route the script runs as `root`; the `buy` login with passwordless
 belongs to the SSH route. The VM has outbound DNS, HTTP, HTTPS, and NTP, but no GCP service
 account or cloud credentials. Output is bounded, so send large artifacts to storage chosen by the user
 rather than printing them.
+
+## Buy through the CLI on Windows
+
+The CLI is developed on macOS and Linux. It works on Windows, with three things that have
+each cost a first-time user an hour:
+
+- **Schannel revocation errors.** A stock Windows `curl` may refuse `https://usebuy.ai`
+  with a certificate-revocation check failure. Pass `--ssl-no-revoke` through `buy curl`,
+  or run the CLI under WSL, where the commands in this skill work unchanged.
+- **PowerShell 5.1 corrupts an inline JSON body.** The `buy.ps1` wrapper that npm installs
+  forwards arguments in a way that strips braces and quotes from `-d '{…}'`, and
+  `Out-File -Encoding utf8` prepends a byte-order mark that the console hides but the
+  gateway rejects with `400 body must be valid JSON`. Write the body to a file without a
+  BOM and let curl read it:
+
+  ```powershell
+  $body = '{"script":"uname -a; nproc","machineType":"e2-micro"}'
+  [IO.File]::WriteAllText("$PWD\body.json", $body, (New-Object Text.UTF8Encoding $false))
+  npx --yes @celo/buy@0.7.0 curl --max-amount 0.02 -X POST `
+    -H "content-type: application/json" -d "@body.json" `
+    https://usebuy.ai/google/vm | Tee-Object -Variable response
+  [IO.File]::WriteAllLines("$PWD\response.json", $response, (New-Object Text.UTF8Encoding $false))
+  ```
+
+  Save the response the same way. On PowerShell 5.1 `Tee-Object -FilePath` writes UTF-16LE
+  (`-Encoding` only exists from PowerShell 7.2), and a UTF-16 file holding the one copy of
+  the poll URL is rejected by `jq` and every UTF-8 JSON parser.
+
+  Global flags such as `--account` and `--verbose` go before `curl`; placed after the URL
+  they are forwarded to curl, which rejects them.
+- **Keep stdout and stderr apart.** The server body is stdout and the CLI's JSON error
+  envelope is stderr, and PowerShell 5.1 additionally wraps native stderr in a
+  `NativeCommandError` record. Redirecting `2>&1` into one file interleaves two objects that
+  both start with `"error"`. Capture stdout alone and read stderr separately.
 
 ## Buy an SSH session instead
 
@@ -349,9 +410,12 @@ buy_curl
 
 Quote that renewal URL first, obtain approval for the new payment, and use the returned
 `maxAmountRequired`. A renewal is a separate irreversible payment and reboots the VM;
-for the attestation-gated `e2-standard-*` sizes it also rechecks the Self attestation. The boot disk survives, but the ephemeral external IP may
-change; always use the renewed response's `ip` and expect SSH to warn about a changed host key. It cannot extend the instance beyond 24 hours from its
-original creation. A completed script normally does not need renewal because its result
+for the attestation-gated `e2-standard-*` sizes it also rechecks the Self attestation. The boot disk survives, and the renewal quote describes the external IP as surviving too;
+it has been observed to survive, and the quoted 2–3 minutes of downtime measured about one
+minute from the request to sshd accepting connections again. Still read `ip` from the
+renewed response rather than assuming it, and if it did change expect SSH to warn about a
+changed host key. A renewal cannot extend the instance beyond 24 hours from its original
+creation. A completed script normally does not need renewal because its result
 is retained for polling.
 
 Renewal ownership is wallet-only: a different wallet receives `403 not_your_lease`,
