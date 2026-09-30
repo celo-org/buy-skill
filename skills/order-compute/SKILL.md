@@ -233,10 +233,37 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
 )
 ```
 
-Set `--max-amount` from the current quote rather than copying the example. Add
-`--token USDT` or `--token USAT` only when the user chose that token. Keep the generated response file private: it
-contains the poll URL used to read the result. Delete it after the lease and retained-result
-window end.
+Set `--max-amount` from the current quote rather than copying the example. **`--max-amount`
+is a decimal token amount, while the quote's `maxAmountRequired` and the MCP `maxAmount`
+field are atomic.** A quote of `16753` atomic is `0.016753` USDC, so pass
+`--max-amount 0.016753` or a little more; `--max-amount 16753` would authorize 16,753 USDC.
+Add `--token USDT` or `--token USAT` only when the user chose that token. Keep the generated
+response file private: it contains the poll URL used to read the result. Delete it after
+the lease and retained-result window end.
+
+### Preview the price without paying
+
+There is no `buy quote` subcommand; `buy quote …` fails with `unknown command 'quote'`.
+The free preview is the 402 challenge itself, which any unpaid request receives and which
+needs no wallet:
+
+```sh
+curl -s -X POST -H 'content-type: application/json' \
+  --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
+  https://usebuy.ai/google/vm | jq '.accepts[] | {asset, maxAmountRequired, description}'
+```
+
+Each `accepts` entry is one token at the same atomic price. With MCP, `buy_pay_quote` does
+the same and never signs.
+
+### Read the outcome from the body, not the exit code
+
+On `0.7.0`, `buy curl` can exit `1` after a paid request that returned HTTP 200 with a
+complete body on stdout and nothing on stderr; it has been observed on `/google/ssh` and on
+renewal. A complete JSON response carrying `transaction` and `poll` means the payment
+settled and the purchase exists, whatever the exit code says. Never treat a non-zero exit
+alone as a failed purchase, and never buy again because of one. Check the saved response
+file first, then `buy receipts`.
 
 ## Collect the result
 
@@ -322,9 +349,12 @@ buy_curl
 
 Quote that renewal URL first, obtain approval for the new payment, and use the returned
 `maxAmountRequired`. A renewal is a separate irreversible payment and reboots the VM;
-for the attestation-gated `e2-standard-*` sizes it also rechecks the Self attestation. The boot disk survives, but the ephemeral external IP may
-change; always use the renewed response's `ip` and expect SSH to warn about a changed host key. It cannot extend the instance beyond 24 hours from its
-original creation. A completed script normally does not need renewal because its result
+for the attestation-gated `e2-standard-*` sizes it also rechecks the Self attestation. The boot disk survives, and the renewal quote describes the external IP as surviving too;
+it has been observed to survive, and the quoted 2–3 minutes of downtime measured about one
+minute from the request to sshd accepting connections again. Still read `ip` from the
+renewed response rather than assuming it, and if it did change expect SSH to warn about a
+changed host key. A renewal cannot extend the instance beyond 24 hours from its original
+creation. A completed script normally does not need renewal because its result
 is retained for polling.
 
 Renewal ownership is wallet-only: a different wallet receives `403 not_your_lease`,
