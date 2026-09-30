@@ -105,7 +105,7 @@ body:
     id: contact
     attributes:
       label: Contact (optional)
-      description: An email, handle, or ENS name a maintainer can reach if the entry needs a fix. It is not published.
+      description: An email, handle, or ENS name a maintainer can reach if the entry needs a fix. Visible in the public issue like every other field; leave it blank and a maintainer will ask here if needed.
 
   - type: checkboxes
     id: checks
