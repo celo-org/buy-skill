@@ -15,6 +15,21 @@ https://usebuy.ai/google/vm
 It settles real USDC, USDT or USAT on Celo mainnet. Payment is irreversible. Use a local
 sandbox instead when it can do the work safely.
 
+## Fast path
+
+A purchase needs four calls, and only one of them costs money:
+
+1. `GET https://usebuy.ai/google/catalog`, free. One response lists every machine type
+   with its price, RAM, guaranteed vCPU share and whether Self attestation is required,
+   plus the accepted tokens. Choose the type from this; do not probe each type with a POST.
+2. Quote the exact body once (`buy_pay_quote`, or an unpaid `curl` POST), free. This
+   confirms the price for that body and is the only place to read `maxAmountRequired`.
+3. Pay once with the same body (`buy_curl`, or `buy curl`).
+4. Poll the returned URL with a free GET until `scriptStatus` is `done`.
+
+Everything below explains each step. Do not add calls between them: each extra probe adds
+latency for the user, and an extra *paid* call is a second charge.
+
 ## Non-negotiable boundaries
 
 - Quote before paying. The request body determines the price.
@@ -85,11 +100,15 @@ authoritative, and anything written here can age.
 These are standard on-demand VMs, never Spot. They run in `us-west1`, start with a
 one-hour lease, and may be renewed up to 24 hours total from creation.
 
-**Egress is restricted.** A leased VM can reach DNS (53), HTTP (80), HTTPS (443) and NTP
-(123), and nothing else — outbound SSH, SMTP and arbitrary TCP are denied. `apt`, `curl`,
-`git` over HTTPS and package registries work; anything else will hang rather than refuse.
-Inbound, only port 22 is open, and only on `/google/ssh` purchases, which are the only
-ones given an external IP.
+**Egress is restricted, and a denied connection hangs instead of failing.** A leased VM
+can reach DNS (53), HTTP (80), HTTPS (443) and NTP (123), and nothing else — outbound
+SSH, SMTP and arbitrary TCP are silently dropped. `apt`, `curl`, `git` over HTTPS and
+package registries work. Anything else waits forever, inside a lease the user has already
+paid for, and the poll never reaches `done`. Wrap every outbound call in a script with an
+explicit timeout, for example `timeout 20 curl -sS https://example.com/api` or
+`timeout 5 bash -c 'cat < /dev/tcp/host/25'`, so a blocked port turns into an exit code
+the script can report rather than a lease that runs out. Inbound, only port 22 is open,
+and only on `/google/ssh` purchases, which are the only ones given an external IP.
 
 Choose the smallest machine that fits:
 
@@ -135,14 +154,22 @@ knowing before a purchase fails on funds:
 - **CLI**: `buy whoami`, which prints the address and every token balance. There is
   no `buy balance` subcommand.
 
-For agent clients, install the local MCP server:
+The MCP server is optional. The CLI performs every operation the tools do, so a host
+that cannot run it loses nothing but typed `maxAmount` fields. For agent clients that
+want it:
 
 ```sh
 npx --yes @celo/buy@0.7.0 mcp install --client all
 ```
 
 Restart the client after its MCP configuration changes. The MCP server uses the same
-keychain wallet; it does not expose the private key to the agent.
+keychain wallet; it does not expose the private key to the agent. If `mcp install` cannot
+register with a client, register it with the client's own command at the same user scope
+`mcp install` uses; for Claude Code:
+
+```sh
+claude mcp add -s user buy -- npx --yes @celo/buy@0.7.0 mcp serve
+```
 
 ## Obtain the Self attestation
 
@@ -150,8 +177,10 @@ keychain wallet; it does not expose the private key to the agent.
 `e2-micro`, `e2-small`, and `e2-medium` are buyable with no proof at all, on both routes —
 the gateway requires an attestation only above a spend threshold, so
 someone without a compatible identity document can still use the service. Check before
-sending a user through verification: if the 402 challenge carries no
-`extra.selfRequirements`, none is needed.
+sending a user through verification: read `attestationRequired` for the chosen type from
+`GET /google/catalog`, which answers for every size in one free call. The 402 quote
+confirms it for the exact body — a challenge with no `extra.selfRequirements` needs no
+attestation — but do not use the 402 as the way to discover it across types.
 
 Where one IS required, these are the live requirements, as served by the gateway today:
 
@@ -240,6 +269,12 @@ field are atomic.** A quote of `16753` atomic is `0.016753` USDC, so pass
 Add `--token USDT` or `--token USAT` only when the user chose that token. Keep the generated
 response file private: it contains the poll URL used to read the result. Delete it after
 the lease and retained-result window end.
+
+The 402 this gateway returns carries `"x402Version": 1`. Celo's public facilitator at
+`api.x402.celo.org`, and resource servers built on `@x402/express`, issue version 2. The
+buy CLI and MCP server handle this gateway's challenge; a client written against the other
+version may fail at parse time with no hint that two versions exist, so name the version
+when a third-party client cannot read the challenge.
 
 ### Preview the price without paying
 
