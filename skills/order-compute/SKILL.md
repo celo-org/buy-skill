@@ -384,12 +384,17 @@ The response says the payment may have settled, and nothing in the CLI resolves 
 `buy receipts` records the attempt as `ambiguous [HTTP 500]` with no transaction hash. Do
 this, in order, and do not buy again while any step is open:
 
-1. Read the saved response file for a `transaction` or `poll` field. A lost response is not
-   evidence that nothing was paid.
-2. Run `buy receipts` and note the row and its correlation ID.
-3. Take the wallet address from `buy whoami` and look it up on a Celo block explorer; check
-   for an outgoing transfer of the quoted amount at the time of the request. A transfer that
-   exists is the payment, and its hash identifies the purchase.
+1. Read the saved response file for a `transaction` or `poll` field, and take the
+   correlation ID from the `500` body there; the CLI records no correlation ID anywhere
+   else. A lost response is not evidence that nothing was paid.
+2. Run `buy receipts` and note the row. It records the time, URL, amount and the
+   `ambiguous` outcome, and for a streamed `buy curl` no transaction hash.
+3. Take the wallet address from `buy whoami` and open it on a Celo block explorer, on the
+   address's **Token transfers** tab, not Transactions: the facilitator broadcasts the
+   settlement, so it never appears in the payer's Transactions list. Look for an outgoing
+   transfer of the quoted amount to the gateway's `payTo` address at the time of the
+   request. A transfer that exists is the payment, and its transaction hash identifies the
+   purchase.
 4. Report the amount, token, correlation ID, and transaction hash if any to the user, and
    file feedback with those fields so the maintainers can look the settlement up.
 
