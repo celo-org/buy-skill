@@ -44,8 +44,20 @@ npx --yes @celo/buy@0.7.0 mcp install --client all
 Restart the agent afterwards so it picks up the new MCP configuration. The server signs
 with the keychain wallet in its own process; the agent never receives key material.
 
-Fund the printed address with a small amount of USDC or USDT on Celo mainnet. You do not
-need CELO — the gateway's sponsor wallet pays the gas.
+The MCP server is a convenience, not a requirement: the CLI does everything the tools do,
+and the skills show both routes. On `0.7.0`, if `mcp install --client all` reports that it
+could not register with a client and prints no error above that line, register it with the
+client's own command instead. For Claude Code:
+
+```sh
+claude mcp add -s user buy -- npx --yes @celo/buy@0.7.0 mcp serve
+```
+
+Fund the printed address with a small amount of USDC, USDT or USAT on Celo mainnet. You do
+not need CELO to buy — the gateway's sponsor wallet pays the gas for x402 settlements. On
+`0.7.0` you do need a little CELO to move the remaining balance *out* again: `buy send` is
+an ordinary ERC-20 transfer paid by the wallet itself, and a stablecoin-only wallet is
+refused before anything is sent. Treat what you deposit as spent.
 
 ## These payments are real
 
@@ -60,6 +72,11 @@ skill spends most of its length on:
   before settlement.
 
 Fund the wallet like a float, not a treasury. Nothing prompts per payment.
+
+Two more things the CLI does on `0.7.0` that trip agents: global flags such as `--json`
+and `--account` must come *before* the subcommand (`buy --json whoami`, not
+`buy whoami --json`), and a bare `buy skills` exits with no output — `buy skills list`
+works, and the endpoints in the `order-compute` skill are the discovery path.
 
 ## Feedback
 
