@@ -275,8 +275,13 @@ each cost a first-time user an hour:
   [IO.File]::WriteAllText("$PWD\body.json", $body, (New-Object Text.UTF8Encoding $false))
   npx --yes @celo/buy@0.7.0 curl --max-amount 0.02 -X POST `
     -H "content-type: application/json" -d "@body.json" `
-    https://usebuy.ai/google/vm | Tee-Object -FilePath response.json
+    https://usebuy.ai/google/vm | Tee-Object -Variable response
+  [IO.File]::WriteAllLines("$PWD\response.json", $response, (New-Object Text.UTF8Encoding $false))
   ```
+
+  Save the response the same way. On PowerShell 5.1 `Tee-Object -FilePath` writes UTF-16LE
+  (`-Encoding` only exists from PowerShell 7.2), and a UTF-16 file holding the one copy of
+  the poll URL is rejected by `jq` and every UTF-8 JSON parser.
 
   Global flags such as `--account` and `--verbose` go before `curl`; placed after the URL
   they are forwarded to curl, which rejects them.
