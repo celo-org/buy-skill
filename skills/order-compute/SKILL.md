@@ -20,7 +20,12 @@ sandbox instead when it can do the work safely.
 - Quote before paying. The request body determines the price.
 - Obtain the user's approval for the exact token and maximum amount unless their request
   already authorizes that spend.
-- Never use `--sandbox`; this gateway is on Celo mainnet.
+- Never use `--sandbox`, and never buy from an account created with `--network sepolia`.
+  This gateway exists on Celo mainnet only; there is no testnet deployment, and a testnet
+  account gets `no_matching_requirements` because every `accepts` entry names `celo`.
+  Testing costs real money here: use the smallest type and a one-line script.
+- Budget every settlement at the quoted price. The 402 quotes the full amount, and no
+  response reports a free allowance or a remaining count; do not promise the user one.
 - Never retry `500 provision_failed` or `500 settle_uncertain`. Payment succeeded or may
   have succeeded, so a retry can charge twice.
 - Report the paid amount, token, transaction hash, instance, expiry, and poll URL.
@@ -373,10 +378,19 @@ failed renewal.
 | `500 provision_failed` | Yes | Never retry. Report the transaction and correlation ID. |
 | `500 settle_uncertain` | Maybe | Never retry. Preserve the transaction, poll URL, and correlation ID. |
 | `500 renew_failed` | Yes | Never retry. Report the outcome, VM status, and transaction. |
+| `no_matching_requirements` (client-side) | No | The account is on a different network from the gateway, usually a `--network sepolia` account or `--sandbox`. Nothing was signed. Switch to a mainnet account with `--account`; there is no testnet gateway to point at instead. |
 
 A network disconnect after sending a paid request is also ambiguous. Do not purchase a
 replacement merely because the response was lost. Preserve any receipt or transaction
 information and tell the user what is known.
+
+**Why the retry rule is asymmetric.** Every refusal in the table marked "No" happens
+before settlement: the client refused to sign, or the gateway refused the payment. Those
+are safe to send again once the cause is fixed. The `500` rows are returned *after* the
+gateway has settled, or while it cannot tell whether it did, and a second request is not a
+resend of the first payment: it is a new payment with a new transaction. Nothing on the
+client can prove that a lost or ambiguous settlement did not land, so "no payment found"
+is never permission to buy again. The section below says what can be established.
 
 ### After `settle_uncertain`
 
