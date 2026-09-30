@@ -129,7 +129,7 @@ The other forms use their own ids — `where`, `says`, `reality`, `impact`, `ver
 Collect the environment rather than asking the user to recite it:
 
 ```sh
-npx --yes @celo/buy@0.7.0 --version
+npx --yes @celo/buy@0.8.0 --version
 node --version
 uname -srm
 date -u +'%Y-%m-%dT%H:%M:%SZ'
@@ -137,7 +137,7 @@ date -u +'%Y-%m-%dT%H:%M:%SZ'
 
 Add the MCP client name and version when the failure came through an MCP tool. `--version`
 may not be recognised on every release; if it is not, report the version the user actually
-invoked — `@celo/buy@0.7.0` — and say that is what was pinned, not what resolved.
+invoked — `@celo/buy@0.8.0` — and say that is what was pinned, not what resolved.
 
 ### Was it charged?
 
@@ -152,10 +152,13 @@ invoked — `@celo/buy@0.7.0` — and say that is what was pinned, not what reso
 | `500 renew_failed` | Yes | Charged, renewal outcome unknown. Include the VM status. |
 | Network disconnect after a paid request | Maybe | Response lost. Do not report it as unpaid. |
 
-Before writing "Maybe", check `buy receipts` — it may show the attempt, and a transaction
-hash resolves it on Celoscan. **An absent receipt field is not evidence that no payment
-happened:** streamed `buy curl` receipts do not retain the transaction hash or poll URL.
-Never have the user retry the purchase to find out; a retry is a second payment.
+Before writing "Maybe", run `buy receipts --resolve`. For a paid request that ended
+without a 2xx it asks the token contract whether the payment settled, and prints
+`settled <tx>`, `not settled`, `not settled yet`, or why it cannot tell; report that line.
+A transaction hash also resolves it on Celoscan. **An absent receipt field is not evidence
+that no payment happened:** receipts written before `0.8.0` keep neither the transaction
+hash nor the poll URL, and cannot be resolved. Never have the user retry the purchase to
+find out; a retry is a second payment.
 
 ## Search before filing
 

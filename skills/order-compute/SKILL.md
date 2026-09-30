@@ -15,6 +15,21 @@ https://usebuy.ai/google/vm
 It settles real USDC, USDT or USAT on Celo mainnet. Payment is irreversible. Use a local
 sandbox instead when it can do the work safely.
 
+## Fast path
+
+A purchase needs four calls, and only one of them costs money:
+
+1. `GET https://usebuy.ai/google/catalog`, free. One response lists every machine type
+   with its price, RAM, guaranteed vCPU share and whether Self attestation is required,
+   plus the accepted tokens. Choose the type from this; do not probe each type with a POST.
+2. Quote the exact body once (`buy_pay_quote`, or an unpaid `curl` POST), free. This
+   confirms the price for that body and is the only place to read `maxAmountRequired`.
+3. Pay once with the same body (`buy_curl`, or `buy curl`).
+4. Poll the returned URL with a free GET until `scriptStatus` is `done`.
+
+Everything below explains each step. Do not add calls between them: each extra probe adds
+latency for the user, and an extra *paid* call is a second charge.
+
 ## Non-negotiable boundaries
 
 - Quote before paying. The request body determines the price.
@@ -27,10 +42,10 @@ sandbox instead when it can do the work safely.
 - Budget every settlement at the quoted price. The 402 quotes the full amount, and no
   response reports a free allowance or a remaining count; do not promise the user one.
 - Never retry `500 provision_failed` or `500 settle_uncertain`. Payment succeeded or may
-  have succeeded, so a retry can charge twice.
+  have succeeded, so a retry can charge twice. `buy receipts --resolve` says which.
 - Report the paid amount, token, transaction hash, instance, expiry, and poll URL.
-- Preserve the paid response. The poll URL is a capability and `buy receipts` does not
-  retain it for streamed CLI calls.
+- Preserve the paid response. The poll URL is a capability; `buy receipts` keeps it, but
+  not the instance, IP, or correlation ID.
 - SSH is a second purchase route, not a flag on `/google/vm`. It is enabled on the public
   deployment. Quote and buy `/google/ssh` for it, and tell the user an interactive session
   bills egress to the operator, so they should close it when done.
@@ -90,11 +105,15 @@ authoritative, and anything written here can age.
 These are standard on-demand VMs, never Spot. They run in `us-west1`, start with a
 one-hour lease, and may be renewed up to 24 hours total from creation.
 
-**Egress is restricted.** A leased VM can reach DNS (53), HTTP (80), HTTPS (443) and NTP
-(123), and nothing else — outbound SSH, SMTP and arbitrary TCP are denied. `apt`, `curl`,
-`git` over HTTPS and package registries work; anything else will hang rather than refuse.
-Inbound, only port 22 is open, and only on `/google/ssh` purchases, which are the only
-ones given an external IP.
+**Egress is restricted, and a denied connection hangs instead of failing.** A leased VM
+can reach DNS (53), HTTP (80), HTTPS (443) and NTP (123), and nothing else — outbound
+SSH, SMTP and arbitrary TCP are silently dropped. `apt`, `curl`, `git` over HTTPS and
+package registries work. Anything else waits forever, inside a lease the user has already
+paid for, and the poll never reaches `done`. Wrap every outbound call in a script with an
+explicit timeout, for example `timeout 20 curl -sS https://example.com/api` or
+`timeout 5 bash -c 'cat < /dev/tcp/host/25'`, so a blocked port turns into an exit code
+the script can report rather than a lease that runs out. Inbound, only port 22 is open,
+and only on `/google/ssh` purchases, which are the only ones given an external IP.
 
 Choose the smallest machine that fits:
 
@@ -114,21 +133,27 @@ The public package requires Node.js 20 or newer and does not require repository 
 Use the pinned release:
 
 ```sh
-npx --yes @celo/buy@0.7.0 setup --name demo
+npx --yes @celo/buy@0.8.0 setup --name demo
 ```
 
 Creating a wallet writes a private key to the user's OS keychain. Do it only with their
-knowledge. Have the user fund the printed address with a small amount of USDC, USDT or USAT on
-Celo mainnet. The wallet does not need CELO because the gateway sponsor pays gas.
+knowledge. If the user has already declared a paying wallet elsewhere (a registration
+form, a leaderboard, an allowlist), do not generate a second one: have them run
+`setup --import --name demo` themselves with the raw hex key in `BUY_IMPORT_KEY` or on
+stdin. Never ask for the key or pass it as an argument. Have the user fund the printed address with a small amount of USDC, USDT or USAT on
+Celo mainnet. The wallet does not need CELO: the gateway sponsor pays gas, and `buy send`
+pays its gas in the token it sends.
 
 Set a daily spend cap before the first purchase. An agent buying on someone's behalf
 should have a ceiling that does not depend on the agent behaving:
 
 ```sh
-npx --yes @celo/buy@0.7.0 account cap demo 1.00
+npx --yes @celo/buy@0.8.0 account cap demo 1.00
 ```
 
-**The amount is in USDC, not atomic units.** `1.00` means one dollar per day. A figure of
+**The amount is in stablecoins (USDC/USDT/USAT), not atomic units.** `1.00` means one
+dollar per day, and the cap is one ceiling over every stablecoin the wallet spends — a USDT
+purchase counts against it exactly as a USDC one does. A figure of
 1000 or more is refused unless `--force` is passed, because a large round number is far
 more likely a units mistake than an intent — and a cap only fails dangerously in one
 direction. `account list` shows the cap, `--clear` removes it.
@@ -140,14 +165,22 @@ knowing before a purchase fails on funds:
 - **CLI**: `buy whoami`, which prints the address and every token balance. There is
   no `buy balance` subcommand.
 
-For agent clients, install the local MCP server:
+The MCP server is optional. The CLI performs every operation the tools do, so a host
+that cannot run it loses nothing but typed `maxAmount` fields. For agent clients that
+want it:
 
 ```sh
-npx --yes @celo/buy@0.7.0 mcp install --client all
+npx --yes @celo/buy@0.8.0 mcp install --client all
 ```
 
 Restart the client after its MCP configuration changes. The MCP server uses the same
-keychain wallet; it does not expose the private key to the agent.
+keychain wallet; it does not expose the private key to the agent. If `mcp install` cannot
+register with a client, register it with the client's own command at the same user scope
+`mcp install` uses; for Claude Code:
+
+```sh
+claude mcp add -s user buy -- npx --yes @celo/buy@0.8.0 mcp serve
+```
 
 ## Obtain the Self attestation
 
@@ -155,8 +188,10 @@ keychain wallet; it does not expose the private key to the agent.
 `e2-micro`, `e2-small`, and `e2-medium` are buyable with no proof at all, on both routes —
 the gateway requires an attestation only above a spend threshold, so
 someone without a compatible identity document can still use the service. Check before
-sending a user through verification: if the 402 challenge carries no
-`extra.selfRequirements`, none is needed.
+sending a user through verification: read `attestationRequired` for the chosen type from
+`GET /google/catalog`, which answers for every size in one free call. The 402 quote
+confirms it for the exact body — a challenge with no `extra.selfRequirements` needs no
+attestation — but do not use the 402 as the way to discover it across types.
 
 Where one IS required, these are the live requirements, as served by the gateway today:
 
@@ -178,7 +213,7 @@ refuse it.
 Those scope, age, and OFAC values are CLI defaults. The user must run:
 
 ```sh
-npx --yes @celo/buy@0.7.0 verify hosted \
+npx --yes @celo/buy@0.8.0 verify hosted \
   --endpoint https://usebuy.ai/self/api/verify
 ```
 
@@ -228,7 +263,7 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
   umask 077
   set -o pipefail
   response_file=$(mktemp ./buy-vm.XXXXXX) || exit
-  npx --yes @celo/buy@0.7.0 --verbose curl --max-amount 0.02 \
+  npx --yes @celo/buy@0.8.0 --verbose curl --max-amount 0.02 \
     -X POST \
     --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
     https://usebuy.ai/google/vm | tee "$response_file"
@@ -246,11 +281,25 @@ Add `--token USDT` or `--token USAT` only when the user chose that token. Keep t
 response file private: it contains the poll URL used to read the result. Delete it after
 the lease and retained-result window end.
 
+The 402 this gateway returns carries `"x402Version": 1`. Celo's public facilitator at
+`api.x402.celo.org`, and resource servers built on `@x402/express`, issue version 2. The
+buy CLI and MCP server handle this gateway's challenge; a client written against the other
+version may fail at parse time with no hint that two versions exist, so name the version
+when a third-party client cannot read the challenge.
+
 ### Preview the price without paying
 
-There is no `buy quote` subcommand; `buy quote …` fails with `unknown command 'quote'`.
-The free preview is the 402 challenge itself, which any unpaid request receives and which
-needs no wallet:
+`buy quote` sends the unpaid request and prints every `accepts` entry in decimal and atomic
+units, with the token, network, `payTo` and description. It needs no wallet and never signs:
+
+```sh
+npx --yes @celo/buy@0.8.0 quote -X POST -H 'content-type: application/json' \
+  --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
+  https://usebuy.ai/google/vm
+```
+
+Add `--json` to get the raw 402 envelope instead of the table. Without the CLI, the same
+preview is the 402 itself, which any unpaid request receives:
 
 ```sh
 curl -s -X POST -H 'content-type: application/json' \
@@ -263,9 +312,8 @@ the same and never signs.
 
 ### Read the outcome from the body, not the exit code
 
-On `0.7.0`, `buy curl` can exit `1` after a paid request that returned HTTP 200 with a
-complete body on stdout and nothing on stderr; it has been observed on `/google/ssh` and on
-renewal. A complete JSON response carrying `transaction` and `poll` means the payment
+`buy curl` has been observed exiting `1` after a paid request that returned HTTP 200 with
+a complete body on stdout and nothing on stderr, on `/google/ssh` and on renewal. A complete JSON response carrying `transaction` and `poll` means the payment
 settled and the purchase exists, whatever the exit code says. Never treat a non-zero exit
 alone as a failed purchase, and never buy again because of one. Check the saved response
 file first, then `buy receipts`.
@@ -282,11 +330,11 @@ terminal the streamed body has been observed cut off inside the `poll` field.
 A successful purchase returns a transaction hash, instance name, expiry, and a signed
 `poll` URL. Poll that exact URL with an ordinary free GET.
 
-**The poll URL cannot be recovered or rebuilt.** It is not derived from the transaction
-hash or the instance name: `https://usebuy.ai/google/vm/<instance>` answers
-`{"error":"not_found"}`, and `buy receipts` does not keep the URL. If the response was
-lost, the lease is paid for and unreachable; there is no recovery path, and buying again is
-a second purchase.
+**The poll URL cannot be rebuilt.** It is not derived from the transaction hash or the
+instance name: `https://usebuy.ai/google/vm/<instance>` answers `{"error":"not_found"}`.
+If the response was lost, run `buy receipts`: the purchase row carries a `poll` line, read
+from the paid response's `Content-Location` header. With neither the response nor that
+line, the lease is paid for and unreachable, and buying again is a second purchase.
 
 Wait about 15 seconds between polls. A poll response looks like this; there is no
 top-level `status` field:
@@ -310,48 +358,6 @@ belongs to the SSH route. The VM has outbound DNS, HTTP, HTTPS, and NTP, but no 
 account or cloud credentials. Output is bounded, so send large artifacts to storage chosen by the user
 rather than printing them.
 
-## Known behaviours of `@celo/buy@0.7.0`
-
-Each of these costs an agent a failed call or a wrong remedy on the pinned release. Most
-are already changed in the client after `0.7.0`, and this section is replaced when the pin
-moves.
-
-- **Global flags go before the subcommand.** `--json`, `--no-json`, `--account`,
-  `--verbose` and `-s` are options of `buy` itself; `buy whoami --json` is refused with
-  `unknown option '--json'`, while `buy --json whoami` works.
-- **Bare command groups print nothing.** `buy skills`, `buy account` and `buy mcp` on
-  their own exit `1` with no output. `buy skills list` works and lists this gateway as
-  `buy/demo-quotes`; the endpoints in this skill are still the discovery path.
-- **`mcp install` hides a failed client command.** It reports
-  `could not register with claude, codex (see error above)` with nothing above it when the
-  client's own command could not be run. Register by hand with
-  `claude mcp add -s user buy -- npx --yes @celo/buy@0.7.0 mcp serve`.
-- **`amount_exceeds_max` mixes units.** The message compares the challenge in atomic units
-  (`16753`) with the cap as typed (`0.0001`); `details.required` and `details.maxAmount`
-  are both atomic. Convert before deciding by how much to raise `--max-amount`, and never
-  raise it past what the user approved.
-- **`--verbose` prints nothing on a successful paid `curl` when stdout is piped**, which
-  the `tee` pattern always is; on a failure its lines appear as `details.log` in the error
-  envelope. The transaction hash is in the response body, not in the verbose output.
-- **`buy send` needs CELO.** It is an ordinary ERC-20 transfer paid by the wallet itself;
-  the gateway's sponsor covers only x402 settlements. A stablecoin-only wallet is refused
-  before anything is broadcast, exits `1`, and says the transfer "may still have gone
-  through": the nested `insufficient funds for gas` detail is the true cause and nothing
-  was sent. Fund like a float and treat what is deposited as spent.
-- **`setup` cannot import a key.** Its options are `--name`, `--network` and `--force`.
-  If the user has already declared an agent wallet somewhere else, the `buy` address is a
-  second wallet and should be declared there too; funding it from the other wallet is an
-  ordinary transfer made outside this CLI.
-- **The cap is one ceiling over every token.** `account cap` confirms in "USDC", but the
-  cap is stored as six-decimal atomic units with no token attached, so a USDT or USAT
-  purchase counts against it at the same rate.
-- **`cpay` names are leftovers.** `setup` prints `stored in OS keychain (legacy
-  service=cpay)` and the VMs are named `cpay-<transaction prefix>`. Both refer to `buy`;
-  the user did not install the wrong tool.
-- **`zone` differs between responses.** The paid response returns `"zone":"us-west1-a"`
-  while the poll returns the full GCE URL ending in `/zones/us-west1-a`. Key on
-  `vmStatus`, `scriptStatus` and `result` from the poll, not on `zone`.
-
 ## Buy through the CLI on Windows
 
 The CLI is developed on macOS and Linux. It works on Windows, with three things that have
@@ -369,7 +375,7 @@ each cost a first-time user an hour:
   ```powershell
   $body = '{"script":"uname -a; nproc","machineType":"e2-micro"}'
   [IO.File]::WriteAllText("$PWD\body.json", $body, (New-Object Text.UTF8Encoding $false))
-  npx --yes @celo/buy@0.7.0 curl --max-amount 0.02 -X POST `
+  npx --yes @celo/buy@0.8.0 curl --max-amount 0.02 -X POST `
     -H "content-type: application/json" -d "@body.json" `
     https://usebuy.ai/google/vm | Tee-Object -Variable response
   [IO.File]::WriteAllLines("$PWD\response.json", $response, (New-Object Text.UTF8Encoding $false))
@@ -392,7 +398,7 @@ each cost a first-time user an hour:
 injected, instead of running a script. Quote it exactly like the script route. With the CLI, use:
 
 ```sh
-npx --yes @celo/buy@0.7.0 --verbose curl --max-amount 0.07 \
+npx --yes @celo/buy@0.8.0 --verbose curl --max-amount 0.07 \
   -X POST \
   --data '{"sshKey":"ssh-ed25519 AAAA… user@host","machineType":"e2-micro"}' \
   https://usebuy.ai/google/ssh
@@ -500,15 +506,22 @@ is never permission to buy again. The section below says what can be established
 
 ### After `settle_uncertain`
 
-The response says the payment may have settled, and nothing in the CLI resolves it:
-`buy receipts` records the attempt as `ambiguous [HTTP 500]` with no transaction hash. Do
-this, in order, and do not buy again while any step is open:
+The response says the payment may have settled. `buy receipts --resolve` answers that from
+the token contract, without trusting the gateway. Do this, in order, and do not buy again
+while any step is open:
 
 1. Read the saved response file for a `transaction` or `poll` field, and take the
    correlation ID from the `500` body there; the CLI records no correlation ID anywhere
    else. A lost response is not evidence that nothing was paid.
-2. Run `buy receipts` and note the row. It records the time, URL, amount and the
-   `ambiguous` outcome, and for a streamed `buy curl` no transaction hash.
+2. Run `buy receipts --resolve`. It prints one answer per receipt still in doubt:
+   - `settled <tx>`: paid, in that transaction.
+   - `not settled: the authorization expired unused …`: it can never settle; paying
+     again is safe.
+   - `not settled yet: it can still settle until <time> …`: do not pay again before that
+     time; run the command again after it.
+   - `settlement unknown: <reason>` or `cannot resolve: …`: go on to step 3. A payment
+     made with `0.7.0` or earlier says `cannot resolve`, because its receipt has no
+     authorization to check.
 3. Take the wallet address from `buy whoami` and open it on a Celo block explorer, on the
    address's **Token transfers** tab, not Transactions: the facilitator broadcasts the
    settlement, so it never appears in the payer's Transactions list. Look for an outgoing
@@ -519,8 +532,8 @@ this, in order, and do not buy again while any step is open:
    file feedback with those fields so the maintainers can look the settlement up.
 
 Inspect local payment history with `buy receipts` (or
-`npx --yes @celo/buy@0.7.0 receipts`). It shows the time, target URL, amount, and network,
-and for some non-streamed entries a transaction hash. Streamed `buy curl` receipts do not
-retain the paid response, transaction hash, poll URL, instance, IP, or correlation ID, so
-for CLI purchases preserve the response with the private `tee` pattern above; do not retry
-a payment because recovery fields are absent from a receipt.
+`npx --yes @celo/buy@0.8.0 receipts`). It shows the time, target URL, amount, network and
+outcome, the settlement transaction hash when the gateway returned one, and for a VM
+purchase the poll URL. It does not keep the response body, instance, IP, or correlation ID,
+so for CLI purchases preserve the response with the private `tee` pattern above; do not
+retry a payment because recovery fields are absent from a receipt.

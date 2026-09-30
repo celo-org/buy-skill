@@ -78,14 +78,15 @@ The current data groups are:
 | Group | APIs |
 |---|---:|
 | X | 19 |
-| Instagram | 36 |
-| TikTok | 33 |
+| Instagram | 35 |
+| TikTok | 32 |
 | Reddit | 22 |
 | YouTube | 32 |
 | LinkedIn | 25 |
-| Flights | 3 |
+| Flights | 2 |
 
-China Southern is intentionally excluded. Treat this table as orientation only; use the
+China Southern, and the MrScraper Instagram, Skyscanner and TikTok search endpoints that
+Monid delisted, are intentionally excluded. Treat this table as orientation only; use the
 live descriptions and schemas to select the actual capability.
 
 The original short routes use simple top-level request bodies. Generated routes normally
