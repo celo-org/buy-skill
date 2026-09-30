@@ -310,6 +310,48 @@ belongs to the SSH route. The VM has outbound DNS, HTTP, HTTPS, and NTP, but no 
 account or cloud credentials. Output is bounded, so send large artifacts to storage chosen by the user
 rather than printing them.
 
+## Known behaviours of `@celo/buy@0.7.0`
+
+Each of these costs an agent a failed call or a wrong remedy on the pinned release. Most
+are already changed in the client after `0.7.0`, and this section is replaced when the pin
+moves.
+
+- **Global flags go before the subcommand.** `--json`, `--no-json`, `--account`,
+  `--verbose` and `-s` are options of `buy` itself; `buy whoami --json` is refused with
+  `unknown option '--json'`, while `buy --json whoami` works.
+- **Bare command groups print nothing.** `buy skills`, `buy account` and `buy mcp` on
+  their own exit `1` with no output. `buy skills list` works and lists this gateway as
+  `buy/demo-quotes`; the endpoints in this skill are still the discovery path.
+- **`mcp install` hides a failed client command.** It reports
+  `could not register with claude, codex (see error above)` with nothing above it when the
+  client's own command could not be run. Register by hand with
+  `claude mcp add -s user buy -- npx --yes @celo/buy@0.7.0 mcp serve`.
+- **`amount_exceeds_max` mixes units.** The message compares the challenge in atomic units
+  (`16753`) with the cap as typed (`0.0001`); `details.required` and `details.maxAmount`
+  are both atomic. Convert before deciding by how much to raise `--max-amount`, and never
+  raise it past what the user approved.
+- **`--verbose` prints nothing on a successful paid `curl` when stdout is piped**, which
+  the `tee` pattern always is; on a failure its lines appear as `details.log` in the error
+  envelope. The transaction hash is in the response body, not in the verbose output.
+- **`buy send` needs CELO.** It is an ordinary ERC-20 transfer paid by the wallet itself;
+  the gateway's sponsor covers only x402 settlements. A stablecoin-only wallet is refused
+  before anything is broadcast, exits `1`, and says the transfer "may still have gone
+  through": the nested `insufficient funds for gas` detail is the true cause and nothing
+  was sent. Fund like a float and treat what is deposited as spent.
+- **`setup` cannot import a key.** Its options are `--name`, `--network` and `--force`.
+  If the user has already declared an agent wallet somewhere else, the `buy` address is a
+  second wallet and should be declared there too; funding it from the other wallet is an
+  ordinary transfer made outside this CLI.
+- **The cap is one ceiling over every token.** `account cap` confirms in "USDC", but the
+  cap is stored as six-decimal atomic units with no token attached, so a USDT or USAT
+  purchase counts against it at the same rate.
+- **`cpay` names are leftovers.** `setup` prints `stored in OS keychain (legacy
+  service=cpay)` and the VMs are named `cpay-<transaction prefix>`. Both refer to `buy`;
+  the user did not install the wrong tool.
+- **`zone` differs between responses.** The paid response returns `"zone":"us-west1-a"`
+  while the poll returns the full GCE URL ending in `/zones/us-west1-a`. Key on
+  `vmStatus`, `scriptStatus` and `result` from the poll, not on `zone`.
+
 ## Buy through the CLI on Windows
 
 The CLI is developed on macOS and Linux. It works on Windows, with three things that have
