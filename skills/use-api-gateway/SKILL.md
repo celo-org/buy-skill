@@ -1,6 +1,6 @@
 ---
 name: use-api-gateway
-description: Use when a user or agent wants to discover or buy browser access or an X, Instagram, TikTok, Reddit, YouTube, LinkedIn, or flight API through the provider-neutral buy gateway. Covers live catalog discovery, bounded result bundles, exact quoting, approval, payment, and safe failure handling.
+description: Use when a user or agent wants to discover or buy browser access or an X, Instagram, TikTok, Reddit, YouTube, LinkedIn, or flight API through the provider-neutral buy gateway, or query free multi-chain on-chain data availability (SQD) across 113+ blockchains. Covers live catalog discovery, exact quoting, approval, payment, safe failure handling, and free SQD data queries.
 ---
 
 # Use the buy API gateway
@@ -157,6 +157,23 @@ it.
 
 Do not copy the URL, body, or maximum from this example without checking the current
 catalog and exact quote.
+
+## Free multi-chain data availability (SQD)
+
+In addition to paid social and web data capabilities, the gateway serves free, unmetered
+on-chain blockchain data across **113+ networks** (EVM, Solana, Bitcoin, Tron, Hyperliquid,
+etc.) through the decentralized SQD Network under the `/sqd/` path prefix.
+
+These endpoints do not require payment, quoting, or wallet signatures:
+
+- **List datasets:** `curl https://gateway.usebuy.ai/sqd/datasets`
+- **Finalized block head:** `curl https://gateway.usebuy.ai/sqd/datasets/<dataset>/finalized-head`
+- **Timestamp resolution:** `curl https://gateway.usebuy.ai/sqd/datasets/<dataset>/timestamps/<timestamp>/block`
+- **Ad-hoc block & log queries:** `curl -X POST https://gateway.usebuy.ai/sqd/datasets/<dataset>/stream -H "content-type: application/json" -d '<query>'`
+
+Free tier access is throttled by client IP (120 req/min, burst 20). See the dedicated
+[`data-availability`](../data-availability/SKILL.md) skill for detailed schemas, filter
+options, and NDJSON response parsing.
 
 ## Return the result
 

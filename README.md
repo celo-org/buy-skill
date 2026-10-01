@@ -12,6 +12,7 @@ charge twice. That is what these skills are for.
 |---|---|
 | [`order-compute`](skills/order-compute/SKILL.md) | Buying a short-lived GCP VM through the public gateway — quoting before paying, running a script or opening an SSH session, polling for results, renewing a lease, and which failures are safe to retry. |
 | [`use-api-gateway`](skills/use-api-gateway/SKILL.md) | Discovering and buying APIs from the provider-neutral buy gateway — starting with X search and LinkedIn posts — while keeping provider credentials server-side and handling paid retries safely. |
+| [`data-availability`](skills/data-availability/SKILL.md) | Querying on-chain blockchain data across 113+ networks (EVM, Solana, Bitcoin, Tron) via SQD on the buy gateway — free ad-hoc block, transaction, log, instruction, finalized head, and timestamp lookups. |
 | [`file-feedback`](skills/file-feedback/SKILL.md) | Reporting a bug, a wrong instruction, a payment problem, or an idea back to the maintainers — redacting keys and poll URLs, checking for duplicates, drafting the report for your approval, and filing it with `gh` or a prefilled issue URL. |
 
 ## Installing a skill
