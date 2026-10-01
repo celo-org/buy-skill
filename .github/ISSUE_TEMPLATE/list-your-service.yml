@@ -1,0 +1,118 @@
+name: List your service in the Buy catalog
+description: You sell something over x402 on Celo and want agents using buy to find it.
+title: "[list] "
+labels: ["listing-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Buy's catalog is curated. Fill this in and a maintainer turns it into a catalog entry.
+        Before filing, make sure an unauthenticated request to your endpoint returns `402 Payment Required`.
+        The docs page [x402: Get your endpoint discovered](https://docs.celo.org/build-on-celo/build-with-ai/x402-get-discovered) covers the other indexes too.
+
+  - type: input
+    id: origin
+    attributes:
+      label: Origin
+      description: The public HTTPS origin that answers 402, e.g. https://api.example.com
+      placeholder: https://api.example.com
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What it does, for an agent deciding whether to call it
+      description: One paragraph, under 500 characters. Say what comes back and when to use it.
+    validations:
+      required: true
+
+  - type: input
+    id: routes
+    attributes:
+      label: Paid routes
+      description: Method and path, comma-separated, e.g. `GET /weather, POST /v1/search`
+    validations:
+      required: true
+
+  - type: input
+    id: price
+    attributes:
+      label: Price per call
+      description: In USD, or a range if it depends on the request, e.g. `$0.01` or `$0.005 to $0.05`
+    validations:
+      required: true
+
+  - type: dropdown
+    id: networks
+    attributes:
+      label: Networks you accept
+      multiple: true
+      options:
+        - "Celo mainnet (eip155:42220)"
+        - "Celo Sepolia (eip155:11142220)"
+        - "Base (eip155:8453)"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tokens
+    attributes:
+      label: Tokens you accept
+      multiple: true
+      options:
+        - USDC
+        - USDT
+        - USAT
+        - wARS
+        - wBRL
+        - wCOP
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: facilitator
+    attributes:
+      label: Facilitator you settle through
+      options:
+        - "Celo facilitator (api.x402.celo.org)"
+        - "Another facilitator"
+        - "Our own relayer"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: bazaar
+    attributes:
+      label: Does your 402 carry the bazaar discovery extension?
+      description: Method, example input, input schema and example output in `extensions.bazaar`. Not required, but agents call you correctly the first time when it is there.
+      options:
+        - "Yes"
+        - "No"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: input
+    id: erc8004
+    attributes:
+      label: ERC-8004 agent id on Celo (optional)
+      placeholder: e.g. 1234
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contact (optional)
+      description: An email, handle, or ENS name a maintainer can reach if the entry needs a fix. Visible in the public issue like every other field; leave it blank and a maintainer will ask here if needed.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: An unauthenticated request to the paid route returns 402 with a price in `accepts`.
+          required: true
+        - label: The description above contains no keys, tokens, or poll URLs.
+          required: true

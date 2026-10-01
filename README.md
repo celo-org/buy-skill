@@ -87,6 +87,12 @@ expense. Redact the token. The same goes for private keys, seed phrases, SSH pri
 and anything Self handed you. A transaction hash is already public on-chain and is the most
 useful thing you can include.
 
+Selling something over x402 on Celo that agents using buy should find? Use the **List your
+service** form in the same issue chooser. It asks for your origin, a one-paragraph description,
+the price, and the networks and tokens you accept; a maintainer turns accepted requests into
+catalog entries. The other indexes are covered in
+[x402: Get your endpoint discovered](https://docs.celo.org/build-on-celo/build-with-ai/x402-get-discovered).
+
 ## Other MCP clients
 
 The skill format is Claude Code's, but nothing in the guidance is specific to it. Any MCP
