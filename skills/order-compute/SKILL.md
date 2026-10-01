@@ -17,15 +17,21 @@ sandbox instead when it can do the work safely.
 
 ## Fast path
 
-A purchase needs four calls, and only one of them costs money:
+Follow these steps; only the purchase costs money:
 
 1. `GET https://usebuy.ai/google/catalog`, free. One response lists every machine type
    with its price, RAM, guaranteed vCPU share and whether Self attestation is required,
    plus the accepted tokens. Choose the type from this; do not probe each type with a POST.
 2. Quote the exact body once (`buy_pay_quote`, or an unpaid `curl` POST), free. This
-   confirms the price for that body and is the only place to read `maxAmountRequired`.
-3. Pay once with the same body (`buy_curl`, or `buy curl`).
-4. Poll the returned URL with a free GET until `scriptStatus` is `done`.
+   confirms the price for that body: read `price.atomic` from the MCP quote, or
+   `maxAmountRequired` from the selected requirement in the raw 402 response.
+3. Pay once with the same URL, method, headers, and body (`buy_curl`, or `buy curl`).
+4. For scripts, poll the returned URL with a free GET until `scriptStatus` is `done`
+   or `failed:<code>`, then report the result. For SSH, `scriptStatus: "not_requested"`
+   is expected: use the returned IP and `ssh` command once `vmStatus` is `RUNNING`,
+   allowing roughly 20 more seconds for sshd. Stop if the lease expires, the VM is
+   deleted or preempted, or the poll returns `404 no such lease`; return any retained
+   result, or report that no result is available.
 
 Everything below explains each step. Do not add calls between them: each extra probe adds
 latency for the user, and an extra *paid* call is a second charge.
@@ -59,13 +65,15 @@ CLI, issue a free `GET` request to:
 https://usebuy.ai/google/catalog
 ```
 
-`GET /google/catalog` is free and side-effect free. Use its `machineTypes` entries for
-the currently supported VM types, guaranteed vCPU share, guest CPU count, memory, disk,
-exact lease price, and whether Self attestation is required. Use its `network`, `region`,
-`tokens`, `leaseSeconds`, and `maxTotalLeaseSeconds` fields for the current service
-configuration. Treat the catalog as the live source for choosing a type and price; still
-quote the exact purchase body before paying, because the 402 challenge is authoritative
-for that request.
+`GET /google/catalog` is free and side-effect free. Each `machineTypes` entry names
+`machineType`, `vcpu` (guaranteed vCPU share), `guestCpus` (guest CPU count), `memoryGb`,
+`diskGb`, `priceAtomic`, `priceUsd`, and `attestationRequired`. `priceAtomic` is a string
+in six-decimal token units: `16753` means `0.016753` USDC, USDT, or USAT. `priceUsd` is
+the corresponding decimal lease price. Use the top-level `network`, `region`, `tokens`,
+`leaseSeconds`, and `maxTotalLeaseSeconds` fields for the current service configuration.
+Read top-level `responseWait` before paying for purchase and renewal wait guidance.
+Treat the catalog as the live source for choosing a type and price; still quote the exact
+purchase body before paying, because the 402 challenge is authoritative for that request.
 
 Two purchase routes sell the same machines at the same price. They differ only in what
 they hand back:
@@ -232,23 +240,26 @@ used for the purchase:
 
 ```text
 buy_pay_quote
-  url:    https://usebuy.ai/google/vm
-  method: POST
-  body:   "{\"script\":\"uname -a; nproc\",\"machineType\":\"e2-micro\"}"
+  url:     https://usebuy.ai/google/vm
+  method:  POST
+  headers: {"content-type":"application/json"}
+  body:    "{\"script\":\"uname -a; nproc\",\"machineType\":\"e2-micro\"}"
 ```
 
-Read the selected token requirement and its `maxAmountRequired`. `buy_pay_quote` never
-signs or pays. If the user has not already approved that spend, state the human-readable
+Read `price.atomic` and `price.token` from the MCP quote. `price.atomic` is the selected
+requirement's `maxAmountRequired` from the raw 402 response. `buy_pay_quote` never signs
+or pays. If the user has not already approved that spend, state the human-readable
 amount and token and wait for approval.
 
-Then reuse the same URL, method, and body:
+Then reuse the same URL, method, headers, and body:
 
 ```text
 buy_curl
   url:       https://usebuy.ai/google/vm
   method:    POST
+  headers:   {"content-type":"application/json"}
   body:      "{\"script\":\"uname -a; nproc\",\"machineType\":\"e2-micro\"}"
-  maxAmount: "<maxAmountRequired from the quote>"
+  maxAmount: "<price.atomic from the MCP quote>"
 ```
 
 `maxAmount` is in atomic token units; USDC, USDT and USAT all use six decimals. Omit any
@@ -264,7 +275,7 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
   set -o pipefail
   response_file=$(mktemp ./buy-vm.XXXXXX) || exit
   npx --yes @celo/buy@0.8.0 --verbose curl --max-amount 0.02 \
-    -X POST \
+    -X POST -H 'content-type: application/json' \
     --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
     https://usebuy.ai/google/vm | tee "$response_file"
   response_status=$?
@@ -273,9 +284,11 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
 )
 ```
 
-Set `--max-amount` from the current quote rather than copying the example. **`--max-amount`
-is a decimal token amount, while the quote's `maxAmountRequired` and the MCP `maxAmount`
-field are atomic.** A quote of `16753` atomic is `0.016753` USDC, so pass
+Keep the URL, method, headers, and body identical between the unpaid quote and paid
+request. Set `--max-amount` from the current quote rather than copying the example.
+**`--max-amount` is a decimal token amount, while the raw 402's `maxAmountRequired`,
+the MCP quote's `price.atomic`, and the MCP `maxAmount` field are atomic.**
+A quote of `16753` atomic is `0.016753` USDC, so pass
 `--max-amount 0.016753` or a little more; `--max-amount 16753` would authorize 16,753 USDC.
 Add `--token USDT` or `--token USAT` only when the user chose that token. Keep the generated
 response file private: it contains the poll URL used to read the result. Delete it after
@@ -351,7 +364,13 @@ Interpret it as follows:
 - `scriptStatus: "not_requested"`: this is an SSH lease; no script was submitted.
 - `scriptStatus: "done"`: return `result` to the user.
 - `scriptStatus: "failed:<code>"`: return the captured result and exit code.
-- `vmStatus: "DELETED"`: the lease ended; a retained result may still be present.
+- `vmStatus: "DELETED"` or `"PREEMPTED"`, the lease has reached `expiresAt`, or the
+  poll returns `404 no such lease`: stop polling and return any retained result; if
+  none is present, report that the lease ended without an available result.
+
+For SSH, do not wait for `scriptStatus: "done"`; no script was requested. Use the
+returned `ip` and `ssh` command when `vmStatus` is `RUNNING`, allowing roughly 20 more
+seconds for sshd to accept connections.
 
 On the script route the script runs as `root`; the `buy` login with passwordless `sudo`
 belongs to the SSH route. The VM has outbound DNS, HTTP, HTTPS, and NTP, but no GCP service
@@ -399,7 +418,7 @@ injected, instead of running a script. Quote it exactly like the script route. W
 
 ```sh
 npx --yes @celo/buy@0.8.0 --verbose curl --max-amount 0.07 \
-  -X POST \
+  -X POST -H 'content-type: application/json' \
   --data '{"sshKey":"ssh-ed25519 AAAA… user@host","machineType":"e2-micro"}' \
   https://usebuy.ai/google/ssh
 ```
@@ -408,9 +427,10 @@ With MCP, use:
 
 ```text
 buy_pay_quote
-  url:    https://usebuy.ai/google/ssh
-  method: POST
-  body:   "{\"sshKey\":\"ssh-ed25519 AAAA… user@host\",\"machineType\":\"e2-micro\"}"
+  url:     https://usebuy.ai/google/ssh
+  method:  POST
+  headers: {"content-type":"application/json"}
+  body:    "{\"sshKey\":\"ssh-ed25519 AAAA… user@host\",\"machineType\":\"e2-micro\"}"
 ```
 
 Send the *public* key — the contents of `~/.ssh/<name>.pub`. Never send a private key. Reuse
@@ -453,11 +473,12 @@ Then use the renewal quote's atomic amount:
 buy_curl
   url:       https://usebuy.ai/google/vm/<poll-token>/renew
   method:    POST
-  maxAmount: "<maxAmountRequired from the renewal quote>"
+  maxAmount: "<price.atomic from the MCP renewal quote>"
 ```
 
 Quote that renewal URL first, obtain approval for the new payment, and use the returned
-`maxAmountRequired`. A renewal is a separate irreversible payment and reboots the VM;
+`price.atomic` from the MCP quote (`maxAmountRequired` in the raw 402 response).
+A renewal is a separate irreversible payment and reboots the VM;
 for the attestation-gated `e2-standard-*` sizes it also rechecks the Self attestation. The boot disk survives, and the renewal quote describes the external IP as surviving too;
 it has been observed to survive, and the quoted 2–3 minutes of downtime measured about one
 minute from the request to sshd accepting connections again. Still read `ip` from the
