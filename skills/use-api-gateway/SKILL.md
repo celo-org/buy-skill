@@ -111,9 +111,11 @@ buy_pay_quote
   body:   "{\"query\":\"Celo agents within_time:1d\",\"type\":\"latest\"}"
 ```
 
-Read the selected payment requirement and `maxAmountRequired`. `buy_pay_quote` is
-read-only and does not sign or pay. State the human-readable price and selected token,
-then obtain approval unless the user already authorized that spend.
+Read `price.atomic` and `price.token` from the quote. `price.atomic` is the selected
+requirement's `maxAmountRequired` from the raw 402 response; the MCP quote has no
+`maxAmountRequired` key of its own. `buy_pay_quote` is read-only and does not sign or
+pay. State the human-readable price and selected token, then obtain approval unless the
+user already authorized that spend.
 
 Reuse the exact request after approval:
 
@@ -122,7 +124,7 @@ buy_curl
   url:       https://gateway.usebuy.ai/v1/social/x/posts/search
   method:    POST
   body:      "{\"query\":\"Celo agents within_time:1d\",\"type\":\"latest\"}"
-  maxAmount: "<maxAmountRequired from the quote>"
+  maxAmount: "<price.atomic from the quote>"
 ```
 
 MCP `maxAmount` is in atomic units. The gateway's supported tokens currently use six
