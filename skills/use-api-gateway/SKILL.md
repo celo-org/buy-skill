@@ -1,6 +1,6 @@
 ---
 name: use-api-gateway
-description: Use when a user or agent wants to discover or buy browser access or an X, Instagram, TikTok, Reddit, YouTube, LinkedIn, or flight API through the provider-neutral buy gateway, buy Celo JSON-RPC through Chainstack or chat completions through Cencori, or query free multi-chain on-chain data availability (SQD) across 113+ blockchains. Covers live catalog discovery, exact quoting, approval, payment, safe failure handling, and free SQD data queries.
+description: Use when a user or agent wants to discover or buy browser sessions, social or flight data, Celo RPC through Chainstack, chat completions through Cencori, or free multi-chain on-chain data through SQD. Covers live catalog discovery, exact quotes, authorized spending, payment receipts and safe failure handling.
 ---
 
 # Use the buy API gateway

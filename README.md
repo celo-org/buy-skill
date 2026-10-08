@@ -67,8 +67,9 @@ skill spends most of its length on:
 - **Quote before paying.** The request body determines the price, so a hardcoded cap
   breaks the moment you ask for a bigger machine.
 - **Never blindly retry a failed purchase.** A `500` can mean the payment already went
-  through; retrying it is a second payment. Only the `4xx` and `503` refusals happen
-  before settlement.
+  through; retrying it is a second payment. Partner errors can also follow settlement.
+  Check the payment receipt and any explicit `paymentSettled: false` before considering
+  another purchase.
 
 Fund the wallet like a float, not a treasury. Nothing prompts per payment.
 
