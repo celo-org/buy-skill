@@ -1,6 +1,6 @@
 ---
 name: use-api-gateway
-description: Use when a user or agent wants to discover or buy browser access or an X, Instagram, TikTok, Reddit, YouTube, LinkedIn, or flight API through the provider-neutral buy gateway, or query free multi-chain on-chain data availability (SQD) across 113+ blockchains. Covers live catalog discovery, exact quoting, approval, payment, safe failure handling, and free SQD data queries.
+description: Use when a user or agent wants to discover or buy browser access or an X, Instagram, TikTok, Reddit, YouTube, LinkedIn, or flight API through the provider-neutral buy gateway, buy Celo JSON-RPC through Chainstack or chat completions through Cencori, or query free multi-chain on-chain data availability (SQD) across 113+ blockchains. Covers live catalog discovery, exact quoting, approval, payment, safe failure handling, and free SQD data queries.
 ---
 
 # Use the buy API gateway
@@ -10,8 +10,8 @@ Discover and buy API calls from the provider-neutral gateway at
 settles real stablecoin payments on Celo mainnet.
 
 Start with the live catalog instead of assuming a provider, route, request schema, or
-price. It currently publishes one browser rental plus 170 inspected data APIs, and can
-change without changing this workflow.
+price. It publishes browser rental, reviewed data APIs and partner paywalls, and can change
+without changing this workflow. Use @celo/buy 0.8.2 or newer for this release.
 
 ## Non-negotiable boundaries
 
@@ -67,27 +67,17 @@ curl --fail --silent --show-error https://gateway.usebuy.ai/v1/catalog
 
 Read each capability's `available`, `method`, `url`, `inputSchema`, and `price` or
 `priceOptions` fields. Each capability also carries a flat `platform` facet (for example
-`x`, `instagram`, `tiktok`, `reddit`, `youtube`, `linkedin`, `flights`, `browser`) — group
+`x`, `instagram`, `tiktok`, `reddit`, `youtube`, `linkedin`, `flights`, `browser`,
+`chainstack`, `cencori`) — group
 or filter on it instead of parsing ids or URLs.
 Select an available capability whose description matches the user's request. Build only
 fields allowed by its current `inputSchema`; the gateway rejects extra provider-specific
 inputs.
 
-The current data groups are:
-
-| Group | APIs |
-|---|---:|
-| X | 19 |
-| Instagram | 35 |
-| TikTok | 32 |
-| Reddit | 22 |
-| YouTube | 32 |
-| LinkedIn | 25 |
-| Flights | 2 |
-
-China Southern, and the MrScraper Instagram, Skyscanner and TikTok search endpoints that
-Monid delisted, are intentionally excluded. Treat this table as orientation only; use the
-live descriptions and schemas to select the actual capability.
+The data groups include X, Instagram, TikTok, Reddit, YouTube, LinkedIn and flights.
+Counts and availability change; read them from the live catalog. China Southern and the
+MrScraper Instagram, Skyscanner and TikTok search endpoints that Monid delisted remain
+excluded.
 
 The original short routes use simple top-level request bodies. Generated routes normally
 accept the inspected input envelope, such as `{"queryParams": {...}}` or
@@ -98,6 +88,30 @@ and include it in the exact request body. This is a hard upstream limit and a fi
 not an estimate: the payment is not prorated if fewer results are returned. Never add or
 modify provider limit fields that are absent from the public `inputSchema`; the gateway
 sets them from `maxResults`.
+
+## Partner paywalls
+
+Discover `chainstack/celo-rpc` or `cencori/inference` for their current instructions.
+Both use the same quote and purchase tools, with a $0.01 flat price per request.
+
+- **Chainstack:** POST `/chainstack/celo` with a JSON-RPC object or a batch of up to
+  2000 calls. The body limit is 128 KiB; one payment buys the whole batch.
+- **Cencori:** POST `/cencori/v1/chat/completions` with model `maximo-atlas-1.3`,
+  non-empty `messages` and `max_tokens` set to 256, 1024 or 4096. The body limit is
+  32 KiB. Allowed optional fields are `temperature`, `top_p`, `stop` and `seed`;
+  streaming, tools, multiple completions, alternate output-limit fields and query
+  strings are refused before payment.
+
+For example, an unpaid Cencori quote:
+
+```sh
+npx --yes @celo/buy@0.8.2 quote -X POST -H 'content-type: application/json' \
+  --data '{"model":"maximo-atlas-1.3","max_tokens":256,"messages":[{"role":"user","content":"Reply OK"}]}' \
+  https://gateway.usebuy.ai/cencori/v1/chat/completions
+```
+
+Obtain the selected token and amount from the exact quote. A partner timeout or error
+may follow settlement; never automatically repeat a paid request.
 
 ## Quote and buy through MCP
 
@@ -177,7 +191,9 @@ options, and NDJSON response parsing.
 
 ## Return the result
 
-On success, read `output` as the provider result and report:
+For Monid capabilities, read `output` as the provider result. Chainstack returns the
+JSON-RPC object or array directly; match batch replies by `id`. Cencori returns the
+OpenAI-compatible response directly; read `choices[0].message.content`. Report:
 
 - the capability used;
 - the selected token and paid amount;
@@ -200,6 +216,7 @@ Classify the response before considering another request:
 | `500 settle_uncertain` | Unknown | Never retry. Preserve `transaction`, `output`, and `correlationId`; report the ambiguity. |
 | Network interruption after sending payment | Unknown | Never retry automatically. Preserve all local output and inspect the transaction or receipt first. |
 | Any response with `retryable: false` | As stated by the response | Stop and report it without retrying. |
+| Partner error with `X-PAYMENT-RESPONSE` | Settled | Preserve the receipt; do not automatically buy again. |
 
 Even when a response says no payment settled, a retry creates a new authorization and can
 start new upstream work. Retry only when the service explicitly permits it and the user
