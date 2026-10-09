@@ -38,8 +38,8 @@ A skill is guidance, not capability. The agent also needs the tools it describes
 `buy_pay_quote`, `buy_curl`, `buy_balance`, `buy_whoami`, `buy_verify_status`:
 
 ```sh
-npx --yes @celo/buy@0.8.1 setup --name buy      # creates a wallet in your OS keychain
-npx --yes @celo/buy@0.8.1 mcp install --client all
+npx --yes @celo/buy@0.8.2 setup --name buy      # creates a wallet in your OS keychain
+npx --yes @celo/buy@0.8.2 mcp install --client all
 ```
 
 Restart the agent afterwards so it picks up the new MCP configuration. The server signs
@@ -50,7 +50,7 @@ and the skills show both routes. If `mcp install` cannot register with a client,
 the client's error; you can also register with the client's own command. For Claude Code:
 
 ```sh
-claude mcp add -s user buy -- npx --yes @celo/buy@0.8.1 mcp serve
+claude mcp add -s user buy -- npx --yes @celo/buy@0.8.2 mcp serve
 ```
 
 Fund the printed address with a small amount of USDC, USDT or USAT on Celo mainnet. You do
@@ -67,8 +67,9 @@ skill spends most of its length on:
 - **Quote before paying.** The request body determines the price, so a hardcoded cap
   breaks the moment you ask for a bigger machine.
 - **Never blindly retry a failed purchase.** A `500` can mean the payment already went
-  through; retrying it is a second payment. Only the `4xx` and `503` refusals happen
-  before settlement.
+  through; retrying it is a second payment. Partner errors can also follow settlement.
+  Check the payment receipt and any explicit `paymentSettled: false` before considering
+  another purchase.
 
 Fund the wallet like a float, not a treasury. Nothing prompts per payment.
 

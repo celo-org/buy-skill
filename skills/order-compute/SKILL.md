@@ -142,7 +142,7 @@ The public package requires Node.js 20 or newer and does not require repository 
 Use the pinned release:
 
 ```sh
-npx --yes @celo/buy@0.8.1 setup --name demo
+npx --yes @celo/buy@0.8.2 setup --name demo
 ```
 
 Creating a wallet writes a private key to the user's OS keychain. Do it only with their
@@ -157,7 +157,7 @@ Set a daily spend cap before the first purchase. An agent buying on someone's be
 should have a ceiling that does not depend on the agent behaving:
 
 ```sh
-npx --yes @celo/buy@0.8.1 account cap demo 1.00
+npx --yes @celo/buy@0.8.2 account cap demo 1.00
 ```
 
 **The amount is in stablecoins (USDC/USDT/USAT), not atomic units.** `1.00` means one
@@ -179,7 +179,7 @@ that cannot run it loses nothing but typed `maxAmount` fields. For agent clients
 want it:
 
 ```sh
-npx --yes @celo/buy@0.8.1 mcp install --client all
+npx --yes @celo/buy@0.8.2 mcp install --client all
 ```
 
 Restart the client after its MCP configuration changes. The MCP server uses the same
@@ -188,7 +188,7 @@ register with a client, register it with the client's own command at the same us
 `mcp install` uses; for Claude Code:
 
 ```sh
-claude mcp add -s user buy -- npx --yes @celo/buy@0.8.1 mcp serve
+claude mcp add -s user buy -- npx --yes @celo/buy@0.8.2 mcp serve
 ```
 
 ## Obtain the Self attestation
@@ -222,7 +222,7 @@ refuse it.
 Those scope, age, and OFAC values are CLI defaults. The user must run:
 
 ```sh
-npx --yes @celo/buy@0.8.1 verify hosted \
+npx --yes @celo/buy@0.8.2 verify hosted \
   --endpoint https://usebuy.ai/self/api/verify
 ```
 
@@ -275,7 +275,7 @@ An unpaid ordinary `curl` POST returns the 402 quote. The buy CLI performs the p
   umask 077
   set -o pipefail
   response_file=$(mktemp ./buy-vm.XXXXXX) || exit
-  npx --yes @celo/buy@0.8.1 --verbose curl --max-amount 0.02 \
+  npx --yes @celo/buy@0.8.2 --verbose curl --max-amount 0.02 \
     -X POST -H 'content-type: application/json' \
     --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
     https://usebuy.ai/google/vm | tee "$response_file"
@@ -307,7 +307,7 @@ when a third-party client cannot read the challenge.
 units, with the token, network, `payTo` and description. It needs no wallet and never signs:
 
 ```sh
-npx --yes @celo/buy@0.8.1 quote -X POST -H 'content-type: application/json' \
+npx --yes @celo/buy@0.8.2 quote -X POST -H 'content-type: application/json' \
   --data '{"script":"uname -a; nproc","machineType":"e2-micro"}' \
   https://usebuy.ai/google/vm
 ```
@@ -323,6 +323,38 @@ curl -s -X POST -H 'content-type: application/json' \
 
 Each `accepts` entry is one token at the same atomic price. With MCP, `buy_pay_quote` does
 the same and never signs.
+
+### Discover partner APIs
+
+The same CLI and wallet can buy API calls from `https://gateway.usebuy.ai`. Discover
+`buy/api-gateway`, `chainstack/celo-rpc` or `cencori/inference` with `buy_discover`, then
+read the returned instructions and quote the exact request before paying. The live
+`/v1/catalog` includes availability and input schemas; catalogue listings are not a
+guarantee that an upstream will complete a request.
+
+Chainstack accepts a JSON-RPC object or a batch of up to 2000 calls, within 128 KiB.
+One $0.01 payment buys the request body. For example, quote Celo's chain ID:
+
+```sh
+npx --yes @celo/buy@0.8.2 quote -X POST -H 'content-type: application/json' \
+  --data '[{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}]' \
+  https://gateway.usebuy.ai/chainstack/celo
+```
+
+Cencori accepts model `maximo-atlas-1.3`, a non-empty `messages` array and a required
+`max_tokens` of 256, 1024 or 4096, within a 32 KiB JSON body. The price is $0.01 per
+completion. Streaming, tools and alternate output-limit fields are refused:
+
+```sh
+npx --yes @celo/buy@0.8.2 quote -X POST -H 'content-type: application/json' \
+  --data '{"model":"maximo-atlas-1.3","max_tokens":256,"messages":[{"role":"user","content":"Reply OK"}]}' \
+  https://gateway.usebuy.ai/cencori/v1/chat/completions
+```
+
+The gateway supports USDC, USDT and USAT on Celo mainnet. Use the token the user chose
+and the amount from the quote. A partner error or timeout can follow settlement: check
+the payment receipt and reconcile uncertain transactions before considering a new
+purchase. Never automatically repeat a settled request.
 
 ### Read the outcome from the body, not the exit code
 
@@ -395,7 +427,7 @@ each cost a first-time user an hour:
   ```powershell
   $body = '{"script":"uname -a; nproc","machineType":"e2-micro"}'
   [IO.File]::WriteAllText("$PWD\body.json", $body, (New-Object Text.UTF8Encoding $false))
-  npx --yes @celo/buy@0.8.1 curl --max-amount 0.02 -X POST `
+  npx --yes @celo/buy@0.8.2 curl --max-amount 0.02 -X POST `
     -H "content-type: application/json" -d "@body.json" `
     https://usebuy.ai/google/vm | Tee-Object -Variable response
   [IO.File]::WriteAllLines("$PWD\response.json", $response, (New-Object Text.UTF8Encoding $false))
@@ -418,7 +450,7 @@ each cost a first-time user an hour:
 injected, instead of running a script. Quote it exactly like the script route. With the CLI, use:
 
 ```sh
-npx --yes @celo/buy@0.8.1 --verbose curl --max-amount 0.07 \
+npx --yes @celo/buy@0.8.2 --verbose curl --max-amount 0.07 \
   -X POST -H 'content-type: application/json' \
   --data '{"sshKey":"ssh-ed25519 AAAA… user@host","machineType":"e2-micro"}' \
   https://usebuy.ai/google/ssh
@@ -554,7 +586,7 @@ while any step is open:
    file feedback with those fields so the maintainers can look the settlement up.
 
 Inspect local payment history with `buy receipts` (or
-`npx --yes @celo/buy@0.8.1 receipts`). It shows the time, target URL, amount, network and
+`npx --yes @celo/buy@0.8.2 receipts`). It shows the time, target URL, amount, network and
 outcome, the settlement transaction hash when the gateway returned one, and for a VM
 purchase the poll URL. It does not keep the response body, instance, IP, or correlation ID,
 so for CLI purchases preserve the response with the private `tee` pattern above; do not
