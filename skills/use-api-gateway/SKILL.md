@@ -1,6 +1,6 @@
 ---
 name: use-api-gateway
-description: Use when a user or agent wants to discover or buy browser sessions, social or flight data, Celo RPC through Chainstack, chat completions through Cencori, or free multi-chain on-chain data through SQD. Covers live catalog discovery, exact quotes, authorized spending, payment receipts and safe failure handling.
+description: Use when a user or agent wants to discover or buy browser sessions, GPU SSH leases, social or flight data, Celo RPC through Chainstack, chat completions through Cencori, or free multi-chain on-chain data through SQD. Covers live catalog discovery, exact quotes, authorized spending, payment receipts and safe failure handling.
 ---
 
 # Use the buy API gateway
@@ -10,7 +10,7 @@ Discover and buy API calls from the provider-neutral gateway at
 settles real stablecoin payments on Celo mainnet.
 
 Start with the live catalog instead of assuming a provider, route, request schema, or
-price. It publishes browser rental, reviewed data APIs and partner paywalls, and can change
+price. It publishes browser rental, GPU leases, reviewed data APIs and partner paywalls, and can change
 without changing this workflow. Use @celo/buy 0.8.2 or newer for this release.
 
 ## Non-negotiable boundaries
@@ -88,6 +88,19 @@ and include it in the exact request body. This is a hard upstream limit and a fi
 not an estimate: the payment is not prorated if fewer results are returned. Never add or
 modify provider limit fields that are absent from the public `inputSchema`; the gateway
 sets them from `maxResults`.
+
+## GPU leases
+
+GPU discovery is the top-level `gpuLeases` object in `/v1/catalog`, separate from
+`capabilities`. Follow its `catalog` URL and check `available`; a successful free
+product quote still determines current upstream stock and price.
+
+For a GPU request, read the [GPU lease procedure](https://github.com/celo-org/buy-skill/blob/main/skills/order-compute/references/vast-gpu.md)
+before spending. It starts with a free `POST` to `gpuLeases.quotes` containing the
+customer's public SSH key. Save `purchaseUrl` and the secret `poll` URL, then quote
+and pay that purchase URL with an empty JSON object. The product-quote endpoint itself
+does not require payment. The full quote price buys a 30-minute GPU container; do not
+apply the per-call `output` handling or CPU renewal procedure to it.
 
 ## Partner paywalls
 

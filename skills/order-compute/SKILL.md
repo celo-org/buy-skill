@@ -1,12 +1,21 @@
 ---
 name: order-compute
-description: Buy a short-lived GCP VM through the public buy gateway when a user or agent needs isolated Linux compute for a command, script, build, or demo, or an interactive SSH session on a real machine. Use for requests to rent, order, buy, or provision disposable compute. Do not use when a local sandbox already fits.
+description: Buy short-lived CPU VMs or RTX 4090 GPU SSH leases through the public buy gateways for isolated Linux commands, builds, demos, CUDA workloads, or interactive SSH. Use for requests to rent, order, buy, or provision disposable compute. Do not use when a local sandbox already fits.
 ---
 
 # Order compute with buy
 
-Buy a real, short-lived Debian VM that runs one script as root and returns its output. The
-public beta gateway is:
+Rent CPU VMs or GPU containers with real stablecoin payments on Celo mainnet.
+Choose the service before quoting:
+
+- **GPU or CUDA workloads:** read [Vast GPU leases](references/vast-gpu.md). The live
+  RTX 4090 service uses a free product quote followed by a paid purchase, customer SSH,
+  and a fixed 30-minute lease. Do not send GPU requests to the Google CPU endpoints.
+- **CPU scripts or CPU SSH:** follow the Google VM procedure below. It supports CPU
+  machine selection, script results, and renewals.
+
+The remaining sections describe CPU VMs only. Buy a short-lived Debian VM that runs
+one script as root and returns its output. The public CPU gateway is:
 
 ```text
 https://usebuy.ai/google/vm
@@ -15,7 +24,7 @@ https://usebuy.ai/google/vm
 It settles real USDC, USDT or USAT on Celo mainnet. Payment is irreversible. Use a local
 sandbox instead when it can do the work safely.
 
-## Fast path
+## CPU fast path
 
 Follow these steps; only the purchase costs money:
 
