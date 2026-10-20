@@ -102,6 +102,58 @@ and pay that purchase URL with an empty JSON object. The product-quote endpoint 
 does not require payment. The full quote price buys a 30-minute GPU container; do not
 apply the per-call `output` handling or CPU renewal procedure to it.
 
+## Browser sessions
+
+Buy a rental by quoting and paying `POST /v1/browser/sessions` with
+`{"durationMinutes": n}`, choosing `n` from the capability's live `inputSchema`. The clock
+starts when the browser is ready, not when payment settles. The paid response carries a
+`browser` object with `sessionId`, `accessToken`, `status`, `readyAt`, `expiresAt`,
+`durationMinutes`, `statusUrl` and `commandUrl`. Treat `accessToken` as a secret: it is
+the only credential for the session.
+
+Drive the browser by POSTing one JSON command at a time to `commandUrl` with
+`Authorization: Bearer <accessToken>`. Commands are not charged separately. Each answer
+is an object with `sessionId`, `expiresAt` and `output`.
+
+| `action` | other fields |
+|---|---|
+| `open` | `url`: public `http(s)`, up to 4096 bytes; private and local addresses are refused |
+| `snapshot` | optional `interactive` (default `true`), `compact`, `depth` (1 to 20) |
+| `click`, `check`, `uncheck`, `focus`, `hover` | `target`: a ref such as `@e1` from the latest snapshot, or a CSS selector |
+| `fill`, `type` | `target`, and `text` up to 8192 bytes of UTF-8 |
+| `press` | `key`, such as `Enter` or `Tab` |
+| `scroll` | `direction` (`up`, `down`, `left`, `right`), optional `pixels` (default 500, up to 10000) |
+| `wait` | `milliseconds` (up to 25000), or `target` as a CSS selector; refs are not accepted |
+| `get` | `kind`: `url` or `title`, or `text` with a `target` (ref or CSS selector) |
+| `back`, `forward`, `reload` | none |
+| `screenshot` | none; `output` has `mimeType: "image/png"` and `base64`, up to 2 MiB |
+
+A `target` is at most 512 bytes. Take a fresh `snapshot` after navigation, because refs
+from an earlier page no longer apply. Page output is cut at 20000 characters. A command
+that runs longer than about 40 seconds returns without its result, as a 200 with `null`
+or partial `output` today and as a `502 browser_runtime_error` once the fixes below are
+deployed. The action may still complete in the browser, so take a `snapshot` before
+repeating it.
+
+Any other action, including script evaluation, is refused with `command_not_allowed`. A
+command with a wrong or missing field is refused with a 400 `invalid_command` that names
+the problem; it costs nothing but rental time. A body that is not a JSON object currently
+comes back as `503 browser_worker_unavailable`, so check the body before concluding the
+worker is down. `GET statusUrl` reports the session and its expiry, and `DELETE statusUrl`
+ends it early. Commands after `expiresAt` fail with `session_expired` or
+`session_not_found`, and `session_not_found` before `expiresAt` means the rental was
+terminated. In either case buy a new session rather than retrying.
+
+Three known problems are tracked together in
+[buy-skill#59](https://github.com/celo-org/buy-skill/issues/59). Until their fixes are
+deployed:
+
+- `screenshot` fails with `502 browser_runtime_error`;
+- `get` with `kind: "text"` is refused by the browser's action policy;
+- `wait` with a ref idles for 25 seconds before failing.
+
+Use `snapshot` to read the page instead.
+
 ## Partner paywalls
 
 Discover `chainstack/celo-rpc` or `cencori/inference` for their current instructions.
