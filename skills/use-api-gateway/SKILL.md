@@ -102,6 +102,43 @@ and pay that purchase URL with an empty JSON object. The product-quote endpoint 
 does not require payment. The full quote price buys a 30-minute GPU container; do not
 apply the per-call `output` handling or CPU renewal procedure to it.
 
+## Browser sessions
+
+Buy a rental by quoting and paying `POST /v1/browser/sessions` with
+`{"durationMinutes": n}`, choosing `n` from the capability's live `inputSchema`. The clock
+starts when the browser is ready, not when payment settles. The paid response carries a
+`browser` object with `sessionId`, `accessToken`, `status`, `readyAt`, `expiresAt`,
+`durationMinutes`, `statusUrl` and `commandUrl`. Treat `accessToken` as a secret: it is
+the only credential for the session.
+
+Drive the browser by POSTing one JSON command at a time to `commandUrl` with
+`Authorization: Bearer <accessToken>`. Commands are not charged separately. Each answer
+is `{"sessionId", "expiresAt", "output"}`.
+
+| `action` | other fields |
+|---|---|
+| `open` | `url`: public `http(s)` only; private and local addresses are refused |
+| `snapshot` | optional `interactive` (default `true`), `compact`, `depth` (up to 20) |
+| `click`, `check`, `uncheck`, `focus`, `hover` | `target`: a ref such as `@e1` from the latest snapshot |
+| `fill`, `type` | `target` and `text` |
+| `press` | `key` |
+| `scroll` | `direction` (`up`, `down`, `left`, `right`), optional `pixels` (default 500) |
+| `wait` | `milliseconds` (up to 25000) or `target` |
+| `get` | `kind`: `url` or `title`, or `text` with a `target` |
+| `back`, `forward`, `reload` | none |
+| `screenshot` | none; `output` is `{"mimeType": "image/png", "base64"}`, up to 2 MiB |
+
+Take a fresh `snapshot` after navigation, because refs from an earlier page no longer
+apply. Any other action, including script evaluation, is refused with
+`command_not_allowed`. A malformed command is refused with a 400 that names the problem
+and costs nothing, but it still uses rental time. `GET statusUrl` reports the session and
+its expiry, and `DELETE statusUrl` ends it early. Commands after `expiresAt` fail with
+`session_expired` or `session_not_found`; buy a new session rather than retrying.
+
+Until the fix for [buy-skill#59](https://github.com/celo-org/buy-skill/issues/59) is
+deployed, `screenshot` fails with `502 browser_runtime_error` while every other action
+works. Use `snapshot` or `get` with `kind: "text"` to read the page instead.
+
 ## Partner paywalls
 
 Discover `chainstack/celo-rpc` or `cencori/inference` for their current instructions.
