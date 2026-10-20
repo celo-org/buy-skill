@@ -113,31 +113,38 @@ the only credential for the session.
 
 Drive the browser by POSTing one JSON command at a time to `commandUrl` with
 `Authorization: Bearer <accessToken>`. Commands are not charged separately. Each answer
-is `{"sessionId", "expiresAt", "output"}`.
+is an object with `sessionId`, `expiresAt` and `output`.
 
 | `action` | other fields |
 |---|---|
-| `open` | `url`: public `http(s)` only; private and local addresses are refused |
-| `snapshot` | optional `interactive` (default `true`), `compact`, `depth` (up to 20) |
-| `click`, `check`, `uncheck`, `focus`, `hover` | `target`: a ref such as `@e1` from the latest snapshot |
-| `fill`, `type` | `target` and `text` |
-| `press` | `key` |
-| `scroll` | `direction` (`up`, `down`, `left`, `right`), optional `pixels` (default 500) |
-| `wait` | `milliseconds` (up to 25000) or `target` |
-| `get` | `kind`: `url` or `title`, or `text` with a `target` |
+| `open` | `url`: public `http(s)`, up to 4096 characters; private and local addresses are refused |
+| `snapshot` | optional `interactive` (default `true`), `compact`, `depth` (1 to 20) |
+| `click`, `check`, `uncheck`, `focus`, `hover` | `target`: a ref such as `@e1` from the latest snapshot, or a CSS selector |
+| `fill`, `type` | `target`, and `text` up to 8192 characters |
+| `press` | `key`, such as `Enter` or `Tab` |
+| `scroll` | `direction` (`up`, `down`, `left`, `right`), optional `pixels` (default 500, up to 10000) |
+| `wait` | `milliseconds` (up to 25000), or `target` as a CSS selector; refs are not accepted |
+| `get` | `kind`: `url` or `title`, or `text` with a `target` (ref or CSS selector) |
 | `back`, `forward`, `reload` | none |
-| `screenshot` | none; `output` is `{"mimeType": "image/png", "base64"}`, up to 2 MiB |
+| `screenshot` | none; `output` has `mimeType: "image/png"` and `base64`, up to 2 MiB |
 
-Take a fresh `snapshot` after navigation, because refs from an earlier page no longer
-apply. Any other action, including script evaluation, is refused with
-`command_not_allowed`. A malformed command is refused with a 400 that names the problem
-and costs nothing, but it still uses rental time. `GET statusUrl` reports the session and
-its expiry, and `DELETE statusUrl` ends it early. Commands after `expiresAt` fail with
-`session_expired` or `session_not_found`; buy a new session rather than retrying.
+A `target` is at most 512 characters. Take a fresh `snapshot` after navigation, because
+refs from an earlier page no longer apply. Page output is cut at 20000 characters, and a
+command that runs longer than about 40 seconds is stopped.
 
-Until the fix for [buy-skill#59](https://github.com/celo-org/buy-skill/issues/59) is
-deployed, `screenshot` fails with `502 browser_runtime_error` while every other action
-works. Use `snapshot` or `get` with `kind: "text"` to read the page instead.
+Any other action, including script evaluation, is refused with `command_not_allowed`. A
+command with a wrong or missing field is refused with a 400 `invalid_command` that names
+the problem; it costs nothing but rental time. A body that is not a JSON object currently
+comes back as `503 browser_worker_unavailable`, so check the body before concluding the
+worker is down. `GET statusUrl` reports the session and its expiry, and `DELETE statusUrl`
+ends it early. Commands after `expiresAt` fail with `session_expired` or
+`session_not_found`, and `session_not_found` before `expiresAt` means the rental was
+terminated. In either case buy a new session rather than retrying.
+
+Until the fixes for [buy-skill#59](https://github.com/celo-org/buy-skill/issues/59) are
+deployed, `screenshot` fails with `502 browser_runtime_error`, `get` with `kind: "text"`
+is refused by the browser's action policy, and `wait` with a ref idles for 25 seconds
+before failing. Use `snapshot` to read the page instead.
 
 ## Partner paywalls
 
