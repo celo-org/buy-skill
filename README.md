@@ -10,7 +10,7 @@ charge twice. That is what these skills are for.
 
 | Skill | What it teaches |
 |---|---|
-| [`order-compute`](skills/order-compute/SKILL.md) | Buying a short-lived CPU VM or RTX 4090 GPU lease — choosing the service, quoting before paying, using SSH, polling for results, CPU renewals, and safe recovery. |
+| [`order-compute`](skills/order-compute/SKILL.md) | Buying a short-lived CPU VM — quoting before paying, using SSH, polling for results, CPU renewals, and safe recovery. |
 | [`use-api-gateway`](skills/use-api-gateway/SKILL.md) | Discovering and buying APIs and GPU leases from the provider-neutral buy gateway while keeping provider credentials server-side and handling paid retries safely. |
 | [`data-availability`](skills/data-availability/SKILL.md) | Querying on-chain blockchain data across 113+ networks (EVM, Solana, Bitcoin, Tron) via SQD on the buy gateway — free ad-hoc block, transaction, log, instruction, finalized head, and timestamp lookups. |
 | [`file-feedback`](skills/file-feedback/SKILL.md) | Reporting a bug, a wrong instruction, a payment problem, or an idea back to the maintainers — redacting keys and poll URLs, checking for duplicates, drafting the report for your approval, and filing it with `gh` or a prefilled issue URL. |
@@ -38,8 +38,8 @@ A skill is guidance, not capability. The agent also needs the tools it describes
 `buy_pay_quote`, `buy_curl`, `buy_balance`, `buy_whoami`, `buy_verify_status`:
 
 ```sh
-npx --yes @celo/buy@0.8.2 setup --name buy      # creates a wallet in your OS keychain
-npx --yes @celo/buy@0.8.2 mcp install --client all
+npx --yes @celo/buy@0.8.4 setup --name buy      # creates a wallet in your OS keychain
+npx --yes @celo/buy@0.8.4 mcp install --client all
 ```
 
 Restart the agent afterwards so it picks up the new MCP configuration. The server signs
@@ -50,7 +50,7 @@ and the skills show both routes. If `mcp install` cannot register with a client,
 the client's error; you can also register with the client's own command. For Claude Code:
 
 ```sh
-claude mcp add -s user buy -- npx --yes @celo/buy@0.8.2 mcp serve
+claude mcp add -s user buy -- npx --yes @celo/buy@0.8.4 mcp serve
 ```
 
 Fund the printed address with a small amount of USDC, USDT or USAT on Celo mainnet. You do
