@@ -123,15 +123,15 @@ is an object with `sessionId`, `expiresAt` and `output`.
 | `fill`, `type` | `target`, and `text` up to 8192 bytes of UTF-8 |
 | `press` | `key`, such as `Enter` or `Tab` |
 | `scroll` | `direction` (`up`, `down`, `left`, `right`), optional `pixels` (default 500, up to 10000) |
-| `wait` | `milliseconds` (up to 25000), or `target` as a CSS selector; refs are not accepted |
+| `wait` | `milliseconds` (up to 25000), or `target` as a CSS selector; refs, `xpath=` targets and bare numbers are refused |
 | `get` | `kind`: `url` or `title`, or `text` with a `target` (ref or CSS selector) |
 | `back`, `forward`, `reload` | none |
 | `screenshot` | none; `output` has `mimeType: "image/png"` and `base64`, up to 2 MiB |
 
 A `target` is at most 512 bytes. Take a fresh `snapshot` after navigation, because refs
 from an earlier page no longer apply. A command whose output exceeds 128 KiB fails with
-`502 output_too_large`; read a narrower selector instead, because a snapshot or the text
-of a very large page may not fit. A command that runs longer than about 40 seconds fails
+`502 output_too_large`; use `get` with `kind: "text"` and a narrower `target` instead,
+because a snapshot or the text of a very large page may not fit. A command that runs longer than about 40 seconds fails
 with `502 browser_runtime_error`. The action may still complete in the browser, so take
 a `snapshot` before repeating it.
 
