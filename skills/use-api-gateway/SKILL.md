@@ -123,17 +123,17 @@ is an object with `sessionId`, `expiresAt` and `output`.
 | `fill`, `type` | `target`, and `text` up to 8192 bytes of UTF-8 |
 | `press` | `key`, such as `Enter` or `Tab` |
 | `scroll` | `direction` (`up`, `down`, `left`, `right`), optional `pixels` (default 500, up to 10000) |
-| `wait` | `milliseconds` (up to 25000), or `target` as a CSS selector; refs are not accepted |
+| `wait` | `milliseconds` (up to 25000), or `target` as a CSS selector; refs, `xpath=` targets and bare numbers are refused |
 | `get` | `kind`: `url` or `title`, or `text` with a `target` (ref or CSS selector) |
 | `back`, `forward`, `reload` | none |
 | `screenshot` | none; `output` has `mimeType: "image/png"` and `base64`, up to 2 MiB |
 
 A `target` is at most 512 bytes. Take a fresh `snapshot` after navigation, because refs
-from an earlier page no longer apply. Page output is cut at 20000 characters. A command
-that runs longer than about 40 seconds returns without its result, as a 200 with `null`
-or partial `output` today and as a `502 browser_runtime_error` once the fixes below are
-deployed. The action may still complete in the browser, so take a `snapshot` before
-repeating it.
+from an earlier page no longer apply. A command whose output exceeds 128 KiB fails with
+`502 output_too_large`; use `get` with `kind: "text"` and a narrower `target` instead,
+because a snapshot or the text of a very large page may not fit. A command that runs longer than about 40 seconds fails
+with `502 browser_runtime_error`. The action may still complete in the browser, so take
+a `snapshot` before repeating it.
 
 Any other action, including script evaluation, is refused with `command_not_allowed`. A
 command with a wrong or missing field is refused with a 400 `invalid_command` that names
@@ -143,16 +143,6 @@ worker is down. `GET statusUrl` reports the session and its expiry, and `DELETE 
 ends it early. Commands after `expiresAt` fail with `session_expired` or
 `session_not_found`, and `session_not_found` before `expiresAt` means the rental was
 terminated. In either case buy a new session rather than retrying.
-
-Three known problems are tracked together in
-[buy-skill#59](https://github.com/celo-org/buy-skill/issues/59). Until their fixes are
-deployed:
-
-- `screenshot` fails with `502 browser_runtime_error`;
-- `get` with `kind: "text"` is refused by the browser's action policy;
-- `wait` with a ref idles for 25 seconds before failing.
-
-Use `snapshot` to read the page instead.
 
 ## Partner paywalls
 
