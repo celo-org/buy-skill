@@ -162,6 +162,12 @@ stdin. Never ask for the key or pass it as an argument. Have the user fund the p
 Celo mainnet. The wallet does not need CELO: the gateway sponsor pays gas, and `buy send`
 pays its gas in the token it sends.
 
+If the user has no stablecoins, point them to
+[Google Cloud's Celo faucet](https://cloud.google.com/application/web3/faucet/celo/mainnet):
+it sends free USAT on Celo mainnet once they verify with Self from a passport in the Self
+app. Only the human can do that; then they send the USAT to the printed address. That wallet
+holds only USAT, so every payment from it needs the USAT token (below).
+
 Set a daily spend cap before the first purchase. An agent buying on someone's behalf
 should have a ceiling that does not depend on the agent behaving:
 
@@ -273,7 +279,10 @@ buy_curl
 ```
 
 `maxAmount` is in atomic token units; USDC, USDT and USAT all use six decimals. Omit any
-`sandbox` field. The default token is USDC; honor an explicit request for USDT or USAT.
+`sandbox` field. The default token is USDC; honor an explicit request for USDT or USAT, and
+when the balance shows no USDC but enough USDT or USAT (a wallet funded from the USAT faucet
+holds only USAT), pass `token: "USAT"` or `token: "USDT"` rather than letting the USDC default
+be refused.
 
 ## Buy through the CLI
 
@@ -300,7 +309,8 @@ request. Set `--max-amount` from the current quote rather than copying the examp
 the MCP quote's `price.atomic`, and the MCP `maxAmount` field are atomic.**
 A quote of `16753` atomic is `0.016753` USDC, so pass
 `--max-amount 0.016753` or a little more; `--max-amount 16753` would authorize 16,753 USDC.
-Add `--token USDT` or `--token USAT` only when the user chose that token. Keep the generated
+Add `--token USDT` or `--token USAT` when the user chose that token, or when the wallet holds
+no USDC but enough of that token. Keep the generated
 response file private: it contains the poll URL used to read the result. Delete it after
 the lease and retained-result window end.
 

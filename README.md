@@ -58,6 +58,13 @@ not need CELO: the gateway's sponsor wallet pays the gas for x402 settlements, a
 `buy send` pays its own gas in the stablecoin it moves, so the remaining balance can be
 moved out of a stablecoin-only wallet. Treat what you deposit as spent.
 
+**No stablecoins yet?** [Google Cloud's Celo faucet](https://cloud.google.com/application/web3/faucet/celo/mainnet)
+sends free USAT on Celo mainnet to a person who verifies once with [Self](https://self.xyz),
+privately, from a passport in the Self app. An agent cannot do this step: the human who owns
+it verifies, then sends the USAT to the address `setup` printed. A wallet funded this way
+holds only USAT, and the default token is USDC, so pay with `--token USAT` on the CLI or
+`token: "USAT"` in MCP. Without it the payment is refused for lack of USDC; nothing is spent.
+
 ## These payments are real
 
 `order-compute` targets gateways that settle **real USDC, USDT or USAT on Celo mainnet**.
