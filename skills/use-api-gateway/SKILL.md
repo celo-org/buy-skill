@@ -223,8 +223,10 @@ buy curl \
 ```
 
 The CLI `--max-amount` value is in whole token units, unlike MCP's atomic `maxAmount`.
-Choose a non-default token only when the user requests it and the exact 402 offer supports
-it.
+Choose a non-default token when the user requests it, or when the wallet holds no USDC but
+enough USDT or USAT (a wallet funded from Google Cloud's USAT faucet holds only USAT), and the
+exact 402 offer supports it: `--token USAT` on the CLI, `token: "USAT"` in MCP. The default
+is USDC, and a USDC payment from a USAT-only wallet is refused before anything is signed.
 
 Do not copy the URL, body, or maximum from this example without checking the current
 catalog and exact quote.
