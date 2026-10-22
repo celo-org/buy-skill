@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       # The pinned version is read out of the skill rather than hardcoded here,
       # so bumping the pin cannot silently leave this checking the old package.
