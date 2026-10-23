@@ -1,0 +1,16 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Pay for services",
+      "description": "Find, quote and pay for APIs, compute and data from an agent, with stablecoins on Celo.",
+      "skills": ["use-api-gateway", "order-compute", "data-availability"]
+    },
+    {
+      "title": "Support",
+      "description": "Report a bug, a payment problem or an idea to the maintainers, redacted and approved first.",
+      "skills": ["file-feedback"]
+    }
+  ]
+}
