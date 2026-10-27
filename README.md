@@ -6,19 +6,57 @@ The MCP server gives an agent the *capability* to pay. It does not teach it what
 buying, how to read a lease, or how to fail safely when money is involved and a retry can
 charge twice. That is what these skills are for.
 
+## Start here
+
+Most agents want [`use-api-gateway`](skills/use-api-gateway/SKILL.md): one workflow for
+everything on the buy gateway (social and flight data, browser sessions, GPU leases, Celo
+RPC, LLM inference). Read the free live catalog, quote the exact request, get the user's
+approval for that price, pay once, and report the transaction hash.
+
+```sh
+npx skills add celo-org/buy-skill                          # all four skills
+npx skills add celo-org/buy-skill --skill use-api-gateway  # just the gateway workflow
+```
+
+The skill alone cannot pay for anything. The agent also needs the buy MCP server or CLI and
+a wallet the user funded: see [Prerequisite](#prerequisite-the-buy-mcp-server) below.
+
 ## Skills
 
 | Skill | What it teaches |
 |---|---|
-| [`order-compute`](skills/order-compute/SKILL.md) | Buying a short-lived CPU VM — quoting before paying, using SSH, polling for results, CPU renewals, and safe recovery. |
 | [`use-api-gateway`](skills/use-api-gateway/SKILL.md) | Discovering and buying APIs and GPU leases from the provider-neutral buy gateway while keeping provider credentials server-side and handling paid retries safely. |
+| [`order-compute`](skills/order-compute/SKILL.md) | Buying a short-lived CPU VM — quoting before paying, using SSH, polling for results, CPU renewals, and safe recovery. |
 | [`data-availability`](skills/data-availability/SKILL.md) | Querying on-chain blockchain data across 113+ networks (EVM, Solana, Bitcoin, Tron) via SQD on the buy gateway — free ad-hoc block, transaction, log, instruction, finalized head, and timestamp lookups. |
 | [`file-feedback`](skills/file-feedback/SKILL.md) | Reporting a bug, a wrong instruction, a payment problem, or an idea back to the maintainers — redacting keys and poll URLs, checking for duplicates, drafting the report for your approval, and filing it with `gh` or a prefilled issue URL. |
 
-## Installing a skill
+## What a skill can and cannot do
 
-Skills are plain Markdown with YAML frontmatter. Copy the directory into wherever your
-agent looks for skills.
+- **It is text.** Each skill is one Markdown file (plus reference pages). Nothing in this
+  repository runs on install, and no skill ships a script or a binary.
+- **It does not install, fund or authorize anything.** The tools it describes come from
+  [`@celo/buy`](https://www.npmjs.com/package/@celo/buy) on npm, published by Celo from its
+  release pipeline with npm trusted publishing. The skills pin the version they were
+  checked against. The key stays in the OS keychain, in the buy process; the agent never
+  sees it.
+- **The user holds the spending authority.** A wallet spends only what its owner put in it.
+  Every paid call carries a maximum (`--max-amount` in the CLI, `maxAmount` over MCP) and is
+  refused before signing when the quote is above it, and the skills require approval of the
+  exact token and amount unless the user's request already authorizes that spend.
+  `buy_send`, which moves money directly, is off unless the user enables it with a budget or
+  an allowlist.
+- **Where the requests go.** Paid calls go to `https://gateway.usebuy.ai` (the buy gateway,
+  run by Celo) and the compute gateway at `https://usebuy.ai`. The gateway holds the
+  upstream providers' credentials, so the agent never handles a third-party API key.
+  Payments settle on Celo mainnet through the x402 facilitator.
+- **Responses are data.** The skills tell the agent to treat what the catalog, a provider, a
+  VM or an issue returns as content to report, never as instructions to follow.
+
+## Installing a skill by hand
+
+Skills are plain Markdown with YAML frontmatter. `npx skills add` (above) copies them for
+most agents; to do it yourself, copy the directory into wherever your agent looks for
+skills.
 
 For Claude Code, either globally:
 
