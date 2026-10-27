@@ -11,7 +11,7 @@ settles real stablecoin payments on Celo mainnet.
 
 Start with the live catalog instead of assuming a provider, route, request schema, or
 price. It publishes browser rental, GPU leases, reviewed data APIs and partner paywalls, and can change
-without changing this workflow. Use @celo/buy 0.8.2 or newer for this release.
+without changing this workflow. Use @celo/buy 0.8.4 or newer for this release.
 
 ## Non-negotiable boundaries
 
@@ -163,7 +163,7 @@ Both use the same quote and purchase tools, with a $0.01 flat price per request.
 For example, an unpaid Cencori quote:
 
 ```sh
-npx --yes @celo/buy@0.8.2 quote -X POST -H 'content-type: application/json' \
+npx --yes @celo/buy@0.8.4 quote -X POST -H 'content-type: application/json' \
   --data '{"model":"maximo-atlas-1.3","max_tokens":256,"messages":[{"role":"user","content":"Reply OK"}]}' \
   https://gateway.usebuy.ai/cencori/v1/chat/completions
 ```
