@@ -124,7 +124,7 @@ paid for, and the poll never reaches `done`. Wrap every outbound call in a scrip
 explicit timeout, for example `timeout 20 curl -sS https://example.com/api` or
 `timeout 5 bash -c 'cat < /dev/tcp/host/25'`, so a blocked port turns into an exit code
 the script can report rather than a lease that runs out. Inbound, only port 22 is open,
-and only on `/google/ssh` purchases, which are the only ones given an external IP.
+and only on `/google/ssh` purchases; a `/google/vm` VM accepts no inbound connections.
 
 Choose the smallest machine that fits:
 
