@@ -163,7 +163,7 @@ Both use the same quote and purchase tools, with a $0.01 flat price per request.
 For example, an unpaid Cencori quote:
 
 ```sh
-npx --yes @celo/buy@0.8.4 quote -X POST -H 'content-type: application/json' \
+npx --yes @celo/buy@0.8.5 quote -X POST -H 'content-type: application/json' \
   --data '{"model":"maximo-atlas-1.3","max_tokens":256,"messages":[{"role":"user","content":"Reply OK"}]}' \
   https://gateway.usebuy.ai/cencori/v1/chat/completions
 ```
