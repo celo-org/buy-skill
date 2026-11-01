@@ -1,0 +1,88 @@
+# Answers a "List your service" request with what the endpoint actually says.
+#
+# Requests come from strangers, so the job is built for that: nothing from the
+# issue reaches a shell, the check runs with no token in its environment, and
+# the only thing it can do with its write access is leave one comment. It is
+# never a pull_request_target job and runs the script from the default branch.
+#
+# Nothing here spends anything or needs a secret. See scripts/check-listing.mjs.
+name: listing check
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/check-listing*.mjs
+      - .github/workflows/listing-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: listing check tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: install the @celo/buy-core version the skill pins
+        run: scripts/install-pinned-core.sh
+
+      - run: node --test scripts/check-listing.test.mjs
+
+  check:
+    name: check the listing request
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'listing-request')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    concurrency:
+      group: listing-check-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: install the @celo/buy-core version the skill pins
+        run: scripts/install-pinned-core.sh
+
+      - name: run the check
+        run: node scripts/check-listing.mjs "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/comment.md"
+
+      # One comment per request, updated in place, so editing the issue does not
+      # stack them up.
+      - name: comment on the request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          existing="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- listing-check -->"))) | .id' \
+            | head -n 1)"
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" \
+              -F "body=@$RUNNER_TEMP/comment.md" > /dev/null
+          else
+            gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
+          fi
