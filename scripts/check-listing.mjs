@@ -147,20 +147,35 @@ export function guardedLookup(hostname, options, callback) {
   });
 }
 
-/** One unpaid request. Resolves to what came back; never follows a redirect. */
-export function probe(origin, route) {
+/**
+ * One unpaid request. Resolves to what came back; never follows a redirect.
+ * Always settles: a connection dropped mid-body, or a server that keeps the
+ * socket busy with a byte at a time, ends in an error rather than a hang.
+ * `request` is injected so tests can drop a response without a server.
+ */
+export function probe(origin, route, { request = https.request, deadlineMs = REQUEST_TIMEOUT_MS } = {}) {
   return new Promise((resolve) => {
     const url = new URL(route.path, origin);
     if (url.origin !== origin) {
       resolve({ error: 'the route leaves the origin' });
       return;
     }
-    const req = https.request(
+    let req;
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      resolve(result);
+      req?.destroy();
+    };
+    const deadline = setTimeout(() => finish({ error: 'no answer within 15 seconds' }), deadlineMs);
+    req = request(
       url,
       {
         method: route.method,
         lookup: guardedLookup,
-        timeout: REQUEST_TIMEOUT_MS,
+        timeout: deadlineMs,
         headers: { accept: 'application/json', 'user-agent': 'buy-listing-check' },
       },
       (res) => {
@@ -169,26 +184,25 @@ export function probe(origin, route) {
         res.on('data', (chunk) => {
           size += chunk.length;
           if (size > MAX_BODY_BYTES) {
-            resolve({ error: 'the response is too large' });
-            req.destroy();
+            finish({ error: 'the response is too large' });
             return;
           }
           chunks.push(chunk);
         });
         res.on('end', () => {
-          resolve({
+          finish({
             status: res.statusCode,
             header: res.headers['payment-required'],
             body: Buffer.concat(chunks).toString('utf8'),
           });
         });
+        res.on('aborted', () => finish({ error: 'the response was cut off' }));
+        res.on('error', () => finish({ error: 'the response was cut off' }));
+        res.on('close', () => finish({ error: 'the response was cut off' }));
       },
     );
-    req.on('timeout', () => {
-      resolve({ error: 'no answer within 15 seconds' });
-      req.destroy();
-    });
-    req.on('error', () => resolve({ error: 'the request failed' }));
+    req.on('timeout', () => finish({ error: 'no answer within 15 seconds' }));
+    req.on('error', () => finish({ error: 'the request failed' }));
     req.end();
   });
 }
@@ -234,12 +248,20 @@ export function readChallenge(response) {
   }
   if (!envelope) return { problems: ['the x402 challenge cannot be read'], offers: [] };
 
-  const onCelo = envelope.accepts.filter((offer) => offer.network === 'celo');
-  if (onCelo.length === 0) return { problems: ['no offer on Celo mainnet'], offers: [] };
-
+  // The parsers check the envelope, not each offer, so the shapes read below
+  // are checked here: a malformed offer gets a sentence, not a crash.
   const problems = [];
+  const shaped = envelope.accepts.filter((offer) => offer && typeof offer === 'object' && !Array.isArray(offer));
+  if (shaped.length < envelope.accepts.length) problems.push('an entry in `accepts` is not an offer object');
+  const onCelo = shaped.filter((offer) => offer.network === 'celo');
+  if (onCelo.length === 0) return { problems: [...problems, 'no offer on Celo mainnet'], offers: [] };
+
   const offers = [];
   for (const offer of onCelo) {
+    if (typeof offer.asset !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(offer.asset)) {
+      problems.push('a Celo offer has no `asset` token address');
+      continue;
+    }
     const token = tokenByAddress('celo', offer.asset);
     if (!token || !isTokenSignable(token)) continue;
     if (offer.scheme !== 'exact') continue;
@@ -249,7 +271,10 @@ export function readChallenge(response) {
       );
       continue;
     }
-    if (!/^\d+$/.test(String(offer.maxAmountRequired))) continue;
+    if (!/^\d+$/.test(String(offer.maxAmountRequired))) {
+      problems.push(`the ${token.symbol} offer's amount is not a whole number of base units`);
+      continue;
+    }
     offers.push({
       symbol: token.symbol,
       amount: String(offer.maxAmountRequired),
@@ -311,7 +336,12 @@ export async function checkRequest({ title, body }, request = probe) {
       add(WARN, name, 'has a path parameter, so it was not requested; check it by hand');
       continue;
     }
-    const seen = readChallenge(await request(origin, route));
+    let seen;
+    try {
+      seen = readChallenge(await request(origin, route));
+    } catch {
+      seen = { problems: ['the 402 could not be read'], offers: [] };
+    }
     route.offers = seen.offers;
     for (const offer of seen.offers) live.add(offer.symbol);
     discoverable ||= Boolean(seen.discoverable);
@@ -353,6 +383,12 @@ const slug = (text) =>
 
 const oneLine = (text) => String(text).replace(/\s+/g, ' ').trim();
 
+// A double-quoted YAML string that the registry's frontmatter parser reads the
+// same way: it strips the quotes and does not unescape, so instead of escaping,
+// a double quote becomes a single one and backslashes and control characters go.
+const yamlString = (text) =>
+  `"${oneLine(text).replace(/"/g, "'").replace(/[\\\u0000-\u001f\u007f]/g, '')}"`;
+
 /** A starting point for the catalog entry, from the form and the live offers. */
 export function draftEntry(report) {
   const { title, form, origin, routes } = report;
@@ -370,8 +406,8 @@ export function draftEntry(report) {
   return [
     '---',
     `name: ${slug(owner)}/${slug(short)}`,
-    `title: ${name} (x402)`,
-    `description: ${oneLine(form[FORM.description])}`,
+    `title: ${yamlString(`${name} (x402)`)}`,
+    `description: ${yamlString(form[FORM.description])}`,
     'category: TODO',
     'stage: experimental',
     `service_url: ${origin}${paid[0].path}`,

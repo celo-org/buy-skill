@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import {
@@ -173,6 +174,60 @@ describe('probe', () => {
     const seen = await probe('https://api.example.com', { method: 'GET', path: '//evil.example/' });
     assert.deepEqual(seen, { error: 'the route leaves the origin' });
   });
+
+  /** A stand-in for https.request: `serve` gets the response to drive by hand. */
+  const fakeRequest = (serve) => (_url, _options, onResponse) => {
+    const req = new EventEmitter();
+    req.destroyed = false;
+    req.destroy = () => {
+      req.destroyed = true;
+    };
+    req.end = () => {
+      const res = new EventEmitter();
+      res.statusCode = 402;
+      res.headers = {};
+      onResponse(res);
+      serve(res, req);
+    };
+    return req;
+  };
+  const route = { method: 'GET', path: '/rates' };
+
+  it('settles when the connection drops mid-body', async () => {
+    for (const drop of ['aborted', 'error', 'close']) {
+      const seen = await probe('https://api.example.com', route, {
+        request: fakeRequest((res) => {
+          res.emit('data', Buffer.from('{"x402Version":'));
+          res.emit(drop, new Error('socket hang up'));
+        }),
+      });
+      assert.deepEqual(seen, { error: 'the response was cut off' }, drop);
+    }
+  });
+
+  it('settles at the deadline when the body never ends', async () => {
+    let req;
+    const seen = await probe('https://api.example.com', route, {
+      deadlineMs: 20,
+      request: fakeRequest((res, r) => {
+        req = r;
+        res.emit('data', Buffer.from('{'));
+      }),
+    });
+    assert.deepEqual(seen, { error: 'no answer within 15 seconds' });
+    assert.equal(req.destroyed, true);
+  });
+
+  it('keeps the answer when the response closes after it ends', async () => {
+    const seen = await probe('https://api.example.com', route, {
+      request: fakeRequest((res) => {
+        res.emit('data', Buffer.from('{}'));
+        res.emit('end');
+        res.emit('close');
+      }),
+    });
+    assert.deepEqual(seen, { status: 402, header: undefined, body: '{}' });
+  });
 });
 
 describe('readChallenge', () => {
@@ -239,6 +294,29 @@ describe('readChallenge', () => {
     assert.deepEqual(readChallenge({ error: 'the request failed' }).offers, []);
   });
 
+  it('gives feedback instead of crashing on malformed offers', () => {
+    const cases = [
+      [[null], 'an entry in `accepts` is not an offer object'],
+      [['x'], 'an entry in `accepts` is not an offer object'],
+      [[v1Offer({ asset: undefined })], 'a Celo offer has no `asset` token address'],
+      [[v1Offer({ asset: 7 })], 'a Celo offer has no `asset` token address'],
+      [[v1Offer({ asset: 'USDC' })], 'a Celo offer has no `asset` token address'],
+      [[v1Offer({ maxAmountRequired: { a: 1 } })], "the USDC offer's amount is not a whole number of base units"],
+      [[v1Offer({ extra: null })], 'the USDC offer needs `extra` set to name `USDC`, version `2`'],
+    ];
+    for (const [accepts, problem] of cases) {
+      const seen = readChallenge(v1(...accepts));
+      assert.ok(seen.problems.includes(problem), `${JSON.stringify(accepts)}: ${seen.problems}`);
+      assert.deepEqual(seen.offers, []);
+    }
+  });
+
+  it('still reads the good offer next to a malformed one', () => {
+    const seen = readChallenge(v1(null, v1Offer()));
+    assert.deepEqual(seen.problems, ['an entry in `accepts` is not an offer object']);
+    assert.equal(seen.offers[0].price, '0.01');
+  });
+
   it('sees the bazaar extension', () => {
     assert.equal(readChallenge(v2([v2Offer()], { extensions: { bazaar: {} } })).discoverable, true);
     assert.equal(readChallenge(v2([v2Offer()])).discoverable, false);
@@ -272,6 +350,25 @@ describe('checkRequest', () => {
       return {};
     });
     assert.equal(calls, 0);
+  });
+
+  it('posts a result for a malformed offer instead of throwing', async () => {
+    const report = await checkRequest({ title: '[list] Rates', body: issue() }, async () => v1(null));
+    const route = report.results.find((r) => r.name === '`GET /rates`');
+    assert.equal(route.level, 'fail');
+    assert.match(renderComment(report), /needs changes/);
+  });
+
+  it('fails a route whose 402 the reader chokes on, and checks the rest', async () => {
+    let calls = 0;
+    const report = await checkRequest(
+      { title: '[list] Rates', body: issue({ 'Paid routes': 'GET /a, GET /b' }) },
+      async () => (++calls === 1 ? { status: 402, get body() { throw new Error('boom'); } } : v1(v1Offer())),
+    );
+    assert.deepEqual(
+      report.results.filter((r) => r.name.startsWith('`')).map((r) => [r.name, r.level, r.detail]),
+      [['`GET /a`', 'fail', 'the 402 could not be read'], ['`GET /b`', 'pass', '0.01 USDC']],
+    );
   });
 
   it('fails a token the form claims and the 402 does not offer', async () => {
@@ -374,6 +471,27 @@ describe('renderComment', () => {
     assert.match(comment, /\| `GET \/rates` \| 0\.01 USDC \|/);
     assert.match(comment, /assets: \[USDC\]/);
     assert.ok(!comment.includes('$99'));
+  });
+
+  it('quotes the title and description so a colon cannot break the frontmatter', async () => {
+    const comment = renderComment(
+      await checkRequest(
+        {
+          title: '[list] Rates: live FX "now" \\ fast',
+          body: issue({ 'What it does, for an agent deciding whether to call it': 'Rates: live FX, key: value' }),
+        },
+        async () => v1(v1Offer()),
+      ),
+    );
+    assert.match(comment, /^title: "Rates: live FX 'now' {2}fast \(x402\)"$/m);
+    assert.match(comment, /^description: "Rates: live FX, key: value"$/m);
+    const frontmatter = comment.match(/^---\n([\s\S]*?)\n---$/m)[1];
+    for (const line of frontmatter.split('\n')) {
+      // Each line is `key: value` with the value either quoted whole or free of `: `,
+      // which is what both YAML and the registry's parser need.
+      const [, value] = line.match(/^\s*[a-z_]+:\s?(.*)$/);
+      assert.ok(/^"[^"\\]*"$/.test(value) || !/: /.test(value), line);
+    }
   });
 
   it('leaves the draft out when no route can be paid', async () => {
