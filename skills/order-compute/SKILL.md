@@ -314,6 +314,36 @@ buy CLI and MCP server handle this gateway's challenge; a client written against
 version may fail at parse time with no hint that two versions exist, so name the version
 when a third-party client cannot read the challenge.
 
+### Using the x402 2.x SDK with this v1 gateway
+
+The npm package version and the wire protocol version are separate. When using
+`@x402/fetch` 2.x with `@x402/evm` 2.x, enable the legacy `ExactEvmSchemeV1`
+client for this gateway's `x402Version: 1` challenge. Registering only the v2
+`ExactEvmScheme` is insufficient. Celo mainnet is `eip155:42220` in CAIP-2;
+this gateway's v1 `accepts` entries use the legacy network name `celo`.
+Do not rewrite the signed requirement to a different network or protocol version.
+
+Before wrapping fetch with payment support:
+
+- Configure `allowedAssets` for the Celo token contract the user approved (USDC,
+  USDT or USAT). Read the contract address from the catalog and check it against
+  the quote; a token ticker alone is not an asset identity. Keep the per-payment
+  cap in the units required by that control, distinct from the raw v1
+  `maxAmountRequired` atomic amount.
+- Supply a `paymentRequirementsSelector` that selects the approved network and
+  asset from `accepts`, rather than accepting the first entry. Reject a challenge
+  with no matching entry, an unexpected recipient or an amount above the approved
+  maximum. In particular, a wallet funded only with USAT must select USAT rather
+  than the default USDC entry.
+- Preserve the exact quoted request and the selected v1 requirement for the paid
+  retry. Creating a payment-aware fetch client can authorize a real transfer on
+  its first 402 response; use ordinary fetch or `buy quote` for an unpaid preview,
+  and obtain approval before enabling payment.
+
+These controls constrain selection and spending; they do not convert a v1
+challenge to v2. If maintaining a custom SDK integration is unnecessary, use the
+pinned buy CLI or MCP server above, which already handles this gateway's version.
+
 ### Preview the price without paying
 
 `buy quote` sends the unpaid request and prints every `accepts` entry in decimal and atomic
