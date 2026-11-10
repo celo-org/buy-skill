@@ -19,6 +19,14 @@ body:
     validations:
       required: true
 
+  - type: input
+    id: operator
+    attributes:
+      label: Operator
+      description: The person, team or company that runs the endpoint and answers for it.
+    validations:
+      required: true
+
   - type: textarea
     id: description
     attributes:
@@ -40,6 +48,25 @@ body:
     attributes:
       label: Price per call
       description: In USD, or a range if it depends on the request, e.g. `$0.01` or `$0.005 to $0.05`
+    validations:
+      required: true
+
+  - type: input
+    id: terms
+    attributes:
+      label: Terms and support
+      description: A link to your terms of use and to where a buyer goes when a paid call fails or needs a refund. One page that covers both is fine.
+      placeholder: https://example.com/terms
+    validations:
+      required: true
+
+  - type: textarea
+    id: data-source
+    attributes:
+      label: Where the data comes from
+      description: If what the endpoint returns is built on another provider's data or API, name each one and link to its terms. Free and public APIs count too, since many do not allow commercial use. If it is your own data or your own computation, say so.
+      placeholder: |
+        e.g. Rates from ExampleFX (https://examplefx.com/terms), cached 60 seconds
     validations:
       required: true
 
@@ -115,4 +142,6 @@ body:
         - label: An unauthenticated request to the paid route returns 402 with a price in `accepts`.
           required: true
         - label: The description above contains no keys, tokens, or poll URLs.
+          required: true
+        - label: What the endpoint returns is my own data, or the terms of every source named above allow reselling it.
           required: true
