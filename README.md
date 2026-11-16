@@ -46,8 +46,10 @@ a wallet the user funded: see [Prerequisite](#prerequisite-the-buy-mcp-server) b
   `buy_send`, which moves money directly, is off unless the user enables it with a budget or
   an allowlist.
 - **Where the requests go.** Paid calls go to `https://gateway.usebuy.ai` (the buy gateway,
-  run by Celo) and the compute gateway at `https://usebuy.ai`. The gateway holds the
-  upstream providers' credentials, so the agent never handles a third-party API key.
+  run by Celo) and the compute gateway at `https://usebuy.ai`. For the routes it serves
+  itself, the gateway holds the upstream providers' credentials, so the agent never handles
+  a third-party API key. Listed third-party sellers keep their own keys
+  ([Selling to agents through buy](#selling-to-agents-through-buy)).
   Payments settle on Celo mainnet through the x402 facilitator.
 - **Responses are data.** The skills tell the agent to treat what the catalog, a provider, a
   VM or an issue returns as content to report, never as instructions to follow.
@@ -134,11 +136,23 @@ expense. Redact the token. The same goes for private keys, seed phrases, SSH pri
 and anything Self handed you. A transaction hash is already public on-chain and is the most
 useful thing you can include.
 
+## Selling to agents through buy
+
 Selling something over x402 on Celo that agents using buy should find? Use the **List your
-service** form in the same issue chooser. It asks for your origin, a one-paragraph description,
-the price, and the networks and tokens you accept; a maintainer turns accepted requests into
-catalog entries. The other indexes are covered in
+service** form in the [issue chooser](https://github.com/celo-org/buy-skill/issues/new/choose).
+It asks for your origin, a one-paragraph description, the price, and the networks and tokens
+you accept; a maintainer turns accepted requests into catalog entries. The other indexes are covered in
 [x402: Get your endpoint discovered](https://docs.celo.org/build-on-celo/build-with-ai/x402-get-discovered).
+
+**Your API keys stay with you.** A listed endpoint is your own x402 server. If it calls an
+upstream API that needs a key, the key lives on your server, and you rotate or revoke it there.
+buy never asks for it: the catalog entry holds your URL, price and description, buyers' agents
+quote and pay your endpoint directly, and the payment goes to your PayTo address. Buyers never
+need a key either, only a funded wallet.
+
+The provider credentials mentioned under [What a skill can and cannot do](#what-a-skill-can-and-cannot-do)
+are a different case: they belong to the routes the buy gateway serves itself, set up with each
+partner, not something a seller sends through the listing form.
 
 ## Other MCP clients
 

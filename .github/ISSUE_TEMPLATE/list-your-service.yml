@@ -8,6 +8,7 @@ body:
       value: |
         Buy's catalog is curated. Fill this in and a maintainer turns it into a catalog entry.
         Before filing, make sure an unauthenticated request to your endpoint returns `402 Payment Required`.
+        Buy never asks for your upstream API keys: they stay on your server. See [Selling to agents through buy](https://github.com/celo-org/buy-skill#selling-to-agents-through-buy).
         The docs page [x402: Get your endpoint discovered](https://docs.celo.org/build-on-celo/build-with-ai/x402-get-discovered) covers the other indexes too.
 
   - type: input
