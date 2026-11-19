@@ -1,0 +1,86 @@
+# Checks the catalog entries a pull request adds or changes under registry/.
+#
+# Pull requests here come from sellers' forks, so the job is built for that:
+# it is a plain pull_request job with a read-only token and no secret, the
+# check script comes from the base branch, and the pull request's files are
+# only ever read as data. See scripts/check-registry.mjs.
+#
+# Nothing here spends anything: each entry gets one unpaid request.
+name: registry check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - registry/**
+      - scripts/check-registry*.mjs
+      - scripts/check-listing.mjs
+      - scripts/install-pinned-core.sh
+      - .github/workflows/registry-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: registry check tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: install the @celo/buy version the skill pins
+        run: scripts/install-pinned-core.sh @celo/buy-registry
+
+      - run: node --test scripts/check-registry.test.mjs
+
+  check:
+    name: quote the changed entries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: registry-check-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      # The check itself: the base branch's copy, never the pull request's.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+
+      # The pull request, merged into its base. Two commits deep, so the first
+      # parent is the base and the diff below is exactly what the PR changes.
+      - uses: actions/checkout@v4
+        with:
+          path: pr
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: list what the pull request changes under registry/
+        working-directory: pr
+        run: git diff --name-status --no-renames HEAD^1 HEAD -- registry/ > "$RUNNER_TEMP/changes.tsv"
+
+      - name: run the check from the base branch
+        working-directory: base
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/check-registry.mjs ]; then
+            echo "The registry check is not on the base branch yet, so there is nothing to run." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          scripts/install-pinned-core.sh @celo/buy-registry
+          status=0
+          node scripts/check-registry.mjs ../pr/registry "$RUNNER_TEMP/changes.tsv" "$RUNNER_TEMP/summary.md" || status=$?
+          if [ -f "$RUNNER_TEMP/summary.md" ]; then cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
+          exit "$status"

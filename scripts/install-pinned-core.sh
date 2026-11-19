@@ -9,4 +9,10 @@ if [ "$(printf '%s\n' "$version" | wc -l)" -ne 1 ] || [ -z "$version" ]; then
   exit 1
 fi
 echo "skill pins @celo/buy@$version"
-npm install --no-save --no-package-lock --ignore-scripts "@celo/buy-core@$version"
+# Any package named as an argument (for example @celo/buy-registry) is
+# installed at the same version, so the checks read with one release.
+packages=("@celo/buy-core@$version")
+for name in "$@"; do
+  packages+=("$name@$version")
+done
+npm install --no-save --no-package-lock --ignore-scripts "${packages[@]}"

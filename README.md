@@ -138,10 +138,12 @@ useful thing you can include.
 
 ## Selling to agents through buy
 
-Selling something over x402 on Celo that agents using buy should find? Use the **List your
-service** form in the [issue chooser](https://github.com/celo-org/buy-skill/issues/new/choose).
-It asks for your origin, a one-paragraph description, the price, and the networks and tokens
-you accept; a maintainer turns accepted requests into catalog entries. The other indexes are covered in
+Selling something over x402 on Celo that agents using buy should find? Add it to the
+[catalog registry](registry/README.md): one `PAY.md` file in a pull request, with the format in
+[registry/LISTING.md](registry/LISTING.md). If you would rather not open a pull request, use the
+**List your service** form in the [issue chooser](https://github.com/celo-org/buy-skill/issues/new/choose)
+and a maintainer writes the file from it. Either way a check quotes your endpoint without
+paying, and a maintainer reviews the entry before it is listed. The other indexes are covered in
 [x402: Get your endpoint discovered](https://docs.celo.org/build-on-celo/build-with-ai/x402-get-discovered).
 
 **Your API keys stay with you.** A listed endpoint is your own x402 server. If it calls an
