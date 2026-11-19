@@ -156,11 +156,7 @@ stdin. Never ask for the key or pass it as an argument. Have the user fund the p
 Celo mainnet. The wallet does not need CELO: the gateway sponsor pays gas, and `buy send`
 pays its gas in the token it sends.
 
-If the user has no stablecoins, point them to
-[Google Cloud's Celo faucet](https://cloud.google.com/application/web3/faucet/celo/mainnet):
-it sends free USAT on Celo mainnet once they verify with Self from a passport in the Self
-app. Only the human can do that; then they send the USAT to the printed address. That wallet
-holds only USAT, so every payment from it needs the USAT token (below).
+A wallet that holds only USDT or USAT pays with that token (below); the default is USDC.
 
 Set a daily spend cap before the first purchase. An agent buying on someone's behalf
 should have a ceiling that does not depend on the agent behaving:
