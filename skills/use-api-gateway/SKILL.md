@@ -265,6 +265,41 @@ OpenAI-compatible response directly; read `choices[0].message.content`. Report:
 Keep `upstreamRunId` for troubleshooting, but do not make the user reason about the
 gateway's private upstream integration unless something failed.
 
+## Limits
+
+A request over a size or rate limit is refused before any payment. A deadline comes
+later, and what it costs depends on the route: on `/v1/*` a call that times out is not
+settled, while a partner route settles first, so a call that hits its deadline was paid
+for. The body limits of the partner routes are in Partner paywalls above.
+
+- **Paid `/v1/*` routes:** a JSON body of at most 64 KiB (`413` above it), and at most
+  16 KiB of request headers in total, the payment header included (`431`).
+- **A quote is valid for 300 seconds** (`maxTimeoutSeconds` in the 402). Sign and send the
+  payment within it.
+- **Upstream deadline on `/v1/*`: 150 seconds**, then `504 timeout` with
+  `paymentSettled: false` and `retryable: false`. Nothing was settled, but do not retry it
+  automatically.
+- **Partner routes have two rate limits each**, one per caller IP and one for the whole
+  route. Both answer `429` with `Retry-After` before payment.
+  - `/chainstack/celo`: 300 requests a minute per IP (burst 50) and 60 a minute for the
+    route (burst 10). Upstream deadline 30 seconds, after settlement: paid, do not
+    retry.
+  - `/cencori/v1/chat/completions`: 120 requests a minute per IP (burst 20) and 60 a
+    minute for the route (burst 10). Upstream deadline 180 seconds, after settlement:
+    paid, do not retry. Wait the full 180 seconds before giving up on a completion.
+  - A `429` that the partner itself returns comes back after settlement, so that request
+    was paid for.
+- **Free SQD route:** 120 requests a minute per IP, burst 20, then `429` with
+  `Retry-After`. All callers together also share 120 requests a minute (burst 20), so a
+  `429` can arrive while you are under your own rate. A POST body of at most 64 KiB, and a
+  30 second upstream deadline.
+- **Spending guards are off until set.** `--max-amount` (CLI, a decimal token amount) or
+  `maxAmount` (MCP, atomic six-decimal units) refuses a quote above it before signing.
+  `buy account cap <name> <amount>` sets a daily cap per account. On the CLI both are
+  decimal token amounts, and either one at 1000 or more is refused without `--force`,
+  because a copied atomic quote such as `16753` would read as 16,753 tokens. MCP
+  `maxAmount` is already atomic, so 1000 there is 0.001 of a token.
+
 ## Handle failures safely
 
 Classify the response before considering another request:
