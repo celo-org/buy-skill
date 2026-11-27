@@ -2,10 +2,14 @@
 # Installs the @celo/buy-core version the skill pins, read out of the skill so
 # bumping the pin cannot leave a check on the old package.
 set -euo pipefail
-version="$(grep -ohE '@celo/buy@[A-Za-z0-9._-]+' skills/order-compute/SKILL.md \
+# Every place this repository shows a pinned command. They must agree: a sync
+# that moved the skill and the README once left the issue templates on the old
+# release, and nothing noticed.
+pinned=(skills/order-compute/SKILL.md README.md .github/ISSUE_TEMPLATE)
+version="$(grep -rohE '@celo/buy@[A-Za-z0-9._-]+' "${pinned[@]}" \
            | sed 's/.*@//' | sort -u)"
 if [ "$(printf '%s\n' "$version" | wc -l)" -ne 1 ] || [ -z "$version" ]; then
-  echo "::error::the skill must pin exactly one @celo/buy version; found: $version"
+  echo "::error::${pinned[*]} must pin exactly one @celo/buy version; found: $(printf '%s ' $version)"
   exit 1
 fi
 echo "skill pins @celo/buy@$version"

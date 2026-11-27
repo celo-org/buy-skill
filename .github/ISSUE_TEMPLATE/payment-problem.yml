@@ -87,7 +87,7 @@ body:
     attributes:
       label: Exact command or MCP tool call
       description: Redact secrets. Do not paste your saved response file.
-      placeholder: npx --yes @celo/buy@0.8.7 --verbose curl --max-amount 0.02 -X POST …
+      placeholder: npx --yes @celo/buy@0.8.8 --verbose curl --max-amount 0.02 -X POST …
       render: text
     validations:
       required: true
@@ -111,7 +111,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: "`npx --yes @celo/buy@0.8.7 --version`, `node --version`, `uname -srm`, and your MCP client if you used one."
+      description: "`npx --yes @celo/buy@0.8.8 --version`, `node --version`, `uname -srm`, and your MCP client if you used one."
       placeholder: |
         @celo/buy: 0.5.0
         node: v20.11.1

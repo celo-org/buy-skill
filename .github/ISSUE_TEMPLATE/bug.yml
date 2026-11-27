@@ -44,7 +44,7 @@ body:
     attributes:
       label: Exact command or MCP tool call
       description: Redact secrets and poll URLs.
-      placeholder: npx --yes @celo/buy@0.8.7 whoami
+      placeholder: npx --yes @celo/buy@0.8.8 whoami
       render: text
     validations:
       required: true
@@ -88,7 +88,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: "`npx --yes @celo/buy@0.8.7 --version`, `node --version`, `uname -srm`, and your MCP client if you used one."
+      description: "`npx --yes @celo/buy@0.8.8 --version`, `node --version`, `uname -srm`, and your MCP client if you used one."
       placeholder: |
         @celo/buy: 0.5.0
         node: v20.11.1
