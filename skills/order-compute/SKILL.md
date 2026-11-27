@@ -313,31 +313,48 @@ when a third-party client cannot read the challenge.
 
 ### Using the x402 2.x SDK with this v1 gateway
 
-The npm package version and the wire protocol version are separate. When using
-`@x402/fetch` 2.x with `@x402/evm` 2.x, enable the legacy `ExactEvmSchemeV1`
-client for this gateway's `x402Version: 1` challenge. Registering only the v2
-`ExactEvmScheme` is insufficient. Celo mainnet is `eip155:42220` in CAIP-2;
-this gateway's v1 `accepts` entries use the legacy network name `celo`.
-Do not rewrite the signed requirement to a different network or protocol version.
+The npm package version and the wire protocol version are separate. This
+gateway's 402 carries `x402Version: 1`, and its `accepts` entries use the legacy
+network name `celo`, not the CAIP-2 name `eip155:42220`. `@x402/core` 2.x matches
+the network name literally, with no alias between the two, so register the legacy
+`ExactEvmSchemeV1` client under `celo`:
+
+```ts
+import { ExactEvmSchemeV1 } from "@x402/evm/v1";
+
+client.registerV1("celo", new ExactEvmSchemeV1(signer));
+```
+
+Registering only the v2 `ExactEvmScheme`, or registering `ExactEvmSchemeV1` under
+`eip155:42220`, leaves nothing that matches this challenge. Do not rewrite the
+signed requirement to a different network or protocol version.
 
 Before wrapping fetch with payment support:
 
-- Configure `allowedAssets` for the Celo token contract the user approved (USDC,
-  USDT or USAT). Read the contract address from the catalog and check it against
-  the quote; a token ticker alone is not an asset identity. Keep the per-payment
-  cap in the units required by that control, distinct from the raw v1
-  `maxAmountRequired` atomic amount.
-- Supply a `paymentRequirementsSelector` that selects the approved network and
-  asset from `accepts`, rather than accepting the first entry. Reject a challenge
-  with no matching entry, an unexpected recipient or an amount above the approved
-  maximum. In particular, a wallet funded only with USAT must select USAT rather
-  than the default USDC entry.
+- Take token contract addresses from the 402's `accepts[].asset`, not from the
+  catalog. `GET /google/catalog` lists only tickers (`USDC`, `USDT`, `USAT`), and
+  a ticker alone is not an asset identity.
+- Pin the token in a `paymentRequirementsSelector` (or a policy registered with
+  `registerPolicy`), not in `spendControls.allowedAssets`. The SDK always allows
+  its default assets, and on Celo those are USDC, USD₮ and USA₮, so an
+  `allowedAssets` list naming only USA₮ can still pay in USDC. The selector must
+  keep only the `accepts` entry whose `asset` is the contract of the token the
+  user approved and whose `payTo` and `maxAmountRequired` match the quote, and
+  must throw when no entry matches rather than fall back to the first one. A
+  wallet funded only with USA₮ must select the USA₮ entry, not the default USDC
+  entry.
+- Set the spend cap in one place and in the right units. The top-level
+  `spendControls.maxAmountPerPayment` is a USD money string (default `"$1"`).
+  `spendControls.allowedAssets[].maxAmountPerPayment` is an integer atomic amount
+  in the same units as `maxAmountRequired` (`"20000"` is 0.02 of a 6-decimal
+  token; `"$0.02"` throws), and for that asset it replaces the top-level USD cap
+  rather than adding to it, so a lower top-level cap does not apply on top.
 - Preserve the exact quoted request and the selected v1 requirement for the paid
   retry. Creating a payment-aware fetch client can authorize a real transfer on
   its first 402 response; use ordinary fetch or `buy quote` for an unpaid preview,
   and obtain approval before enabling payment.
 
-These controls constrain selection and spending; they do not convert a v1
+The selector and caps constrain selection and spending; they do not convert a v1
 challenge to v2. If maintaining a custom SDK integration is unnecessary, use the
 pinned buy CLI or MCP server above, which already handles this gateway's version.
 
